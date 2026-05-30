@@ -1,6 +1,6 @@
 {
   "name": "openplan",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "description": "Interactive plan review for Claude Code — annotate, version, and manage plans in a browser UI.",
   "author": "Smith Gajjar <smith.gajjar@gmail.com>",

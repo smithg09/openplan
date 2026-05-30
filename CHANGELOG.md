@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2025-05-30
+## [0.1.0] - 2026-05-30
 
 ### Added
 
@@ -16,20 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Plan versioning** — automatic version snapshots on every review (`v1.md`, `v2.md`, …) stored under `~/.openplan/plans/`
 - **Annotation UI** — open any markdown file or directory in the browser-based annotation interface with `openplan annotate`
 - **Persistent dashboard** — `openplan serve` starts a long-running dashboard to browse all saved plans and versions
-- **Settings UI** — `openplan config` opens a browser-based settings editor
 - **Session management** — `openplan sessions` lists all active openplan sessions (PID, port, mode)
-- **Plan sharing** — `openplan share <file>` generates a shareable URL (inline fragment or relay-hosted)
-- **Cross-platform installer** — `scripts/install.sh` detects OS/arch and downloads the correct binary from GitHub Releases
 - **Claude Code plugin** — plugin manifest with hooks (`PreToolUse`, `PermissionRequest`) and skills (`openplan`, `openplan-annotate`, `openplan-archive`, `openplan-last`)
-- **CI/CD** — GitHub Actions workflows for continuous integration (typecheck + full build) and automated multi-platform releases on `v*` tags
-- **Configuration** — user config at `~/.openplan/config.json` with browser preference, serve port, and custom hook paths
-
-### Infrastructure
-
-- Go + React monorepo with Bun workspaces and Turborepo
-- Vite frontend with React, Tailwind CSS, and component packages (`shared`, `plan-viewer`, `toolbar`, `annotations`, `diff-viewer`)
-- Go CLI built with Cobra, embeds Vite UI dist at compile time
-- MIT license
 
 [Unreleased]: https://github.com/smithg09/openplan/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/smithg09/openplan/releases/tag/v0.1.0
