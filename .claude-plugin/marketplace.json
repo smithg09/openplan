@@ -1,0 +1,14 @@
+{
+  "name": "openplan",
+  "version": "0.1.0",
+  "owner": { "name": "smithg09" },
+  "description": "Interactive plan review for Claude Code — annotate, version, and manage plans in a browser UI.",
+  "keywords": ["planning", "review", "hooks", "ExitPlanMode", "annotations"],
+  "plugins": [
+    {
+      "name": "openplan",
+      "source": "./apps/plugin",
+      "description": "Interactive plan review: annotate, version, and manage Claude Code plans in a browser UI."
+    }
+  ]
+}

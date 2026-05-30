@@ -1,0 +1,67 @@
+/* Openplan design tokens */
+
+:root {
+  /* === Dark mode (default) === */
+  --bg-base: #0f0f10;
+  --bg-surface: #18181b;
+  --bg-elevated: #1f1f23;
+  --bg-subtle: #27272a;
+  --bg-deep: #0a0a0c;
+  --border: #2e2e33;
+  --border-strong: #52525b;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-faint: #52525b;
+
+  /* accent — sapphire default, overridable at runtime */
+  --accent: #0067bc;
+  --accent-hover: #0055a0;
+  --accent-subtle: #0a1e3a;
+  --accent-fg: #93c5fd;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --comment: #a78bfa;
+  --question: #38bdf8;
+  --highlight: #fbbf24;
+  --approval: #22c55e;
+  --teal: #2dd4bf;
+  --edit-bg: #0d1117;
+
+  /* Fonts */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-serif: "Inter", system-ui, sans-serif;
+
+  /* Layout */
+  --topbar-h: 38px;
+  --banner-h: 24px;
+  --actionbar-h: 48px;
+  --sidebar-w: 240px;
+  --outline-w: 220px;
+  --annopanel-w: 288px;
+  --plan-maxw: 700px;
+  --gutter-w: 40px;
+}
+
+/* Light mode */
+[data-theme="light"] {
+  --bg-base: #f3f4f6;
+  --bg-surface: #f9fafb;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #ecedf0;
+  --bg-inset: #f1f2f4;
+  --bg-deep: #e8e9ec;
+  --bg-hover: #e8e9ec;
+  --border: #d8d9dd;
+  --border-strong: #b0b2b8;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --text-faint: #9a9aa4;
+  --accent-fg: var(--accent);
+  --accent-subtle: #eff6ff;
+  --edit-bg: #f8fafc;
+}

@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/cli/go.mod
+          cache-dependency-path: apps/cli/go.sum
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build UI
+        run: bun run build:ui
+
+      - name: Extract tag
+        id: tag
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Cross-compile Go binaries
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          TARGETS=(
+            "darwin/amd64"
+            "darwin/arm64"
+            "linux/amd64"
+            "linux/arm64"
+          )
+
+          for target in "${TARGETS[@]}"; do
+            GOOS="${target%/*}"
+            GOARCH="${target#*/}"
+            echo "Building openplan for ${GOOS}/${GOARCH}..."
+
+            cd apps/cli
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o ../../openplan .
+            cd ../..
+
+            tar -czf "openplan_${GOOS}_${GOARCH}.tar.gz" openplan
+            rm openplan
+          done
+
+          ls -lh openplan_*.tar.gz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: openplan_*.tar.gz
+          generate_release_notes: true
+          prerelease: ${{ contains(steps.tag.outputs.version, '-') }}

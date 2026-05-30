@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+bin/openplan
+apps/cli/internal/server/ui/dist/
+*.tar.gz
+
+# Turbo
+.turbo/
+
+# Bun
+bun.lockb
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib

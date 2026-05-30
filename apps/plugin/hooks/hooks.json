@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [{ "type": "command", "command": "openplan context", "timeout": 5 }]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [{ "type": "command", "command": "openplan", "timeout": 345600 }]
+      }
+    ]
+  }
+}
