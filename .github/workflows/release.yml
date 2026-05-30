@@ -64,9 +64,18 @@ jobs:
 
           ls -lh openplan_*.tar.gz
 
+      - name: Extract changelog entry
+        id: changelog
+        run: |
+          VERSION="${{ steps.tag.outputs.version }}"
+          BODY=$(awk "/^## \[${VERSION#v}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: openplan_*.tar.gz
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.body }}
           prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
