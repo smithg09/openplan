@@ -170,7 +170,7 @@ const InlineCard: React.FC<{
         <div className="op-inline-card-head-spacer" />
         <button className="op-sel-btn" onClick={onClose} style={{ padding: '0 6px', height: 22 }}>×</button>
       </div>
-      {anno.type !== 'highlight' && anno.type !== 'approval' && anno.type !== 'deletion' && (
+      {anno.type !== 'deletion' && (
         <div className="op-inline-card-quote">
           "{(anno.selectedText?.length ?? 0) > 140 ? anno.selectedText!.slice(0, 138) + '…' : anno.selectedText}"
         </div>

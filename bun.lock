@@ -37,6 +37,9 @@
     "packages/annotations": {
       "name": "@openplan/annotations",
       "version": "0.0.1",
+      "dependencies": {
+        "@openplan/shared": "*",
+      },
       "devDependencies": {
         "@types/react": "^18.3.17",
         "@types/react-dom": "^18.3.5",
@@ -67,6 +70,10 @@
     "packages/plan-viewer": {
       "name": "@openplan/plan-viewer",
       "version": "0.0.1",
+      "dependencies": {
+        "@openplan/shared": "*",
+        "@openplan/toolbar": "*",
+      },
       "devDependencies": {
         "@types/react": "^18.3.17",
         "@types/react-dom": "^18.3.5",
