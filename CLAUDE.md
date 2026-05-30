@@ -8,7 +8,7 @@ Openplan is a **Go + React monorepo** CLI tool for interactive plan review insid
 openplan (root)
 ├── apps/cli/         → Go CLI (cobra-based, entry: main.go)
 ├── apps/ui/          → React + Vite frontend (Tailwind CSS)
-├── apps/plugin/      → Claude Code plugin (hooks + skills)
+├── apps/plugin/      → Claude Code plugin (hooks + commands)
 └── packages/         → Shared React component packages
     ├── shared/
     ├── plan-viewer/
@@ -66,7 +66,7 @@ The hook reads a JSON event from stdin, processes the plan content, and returns 
 - `apps/cli/internal/config/` — Configuration management
 - `apps/cli/internal/server/ui/dist/` — Embedded UI build output (gitignored)
 - `apps/plugin/hooks/hooks.json` — Claude Code hook definitions
-- `apps/plugin/skills/` — Skill markdown files
+- `apps/plugin/commands/` — Slash command markdown files
 - `~/.openplan/` — User data directory (plans, config, sessions)
 
 ## Key Conventions
