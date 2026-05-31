@@ -29,7 +29,9 @@
     "build:cli": "cd apps/cli && go build -o ../../bin/openplan .",
     "build": "bun run build:ui && bun run build:cli",
     "lint": "turbo lint",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "test:cli": "cd apps/cli && go test ./...",
+    "test:coverage:cli": "cd apps/cli && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep total"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

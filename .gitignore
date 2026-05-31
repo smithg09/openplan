@@ -38,3 +38,5 @@ Thumbs.db
 *.dll
 *.so
 *.dylib
+apps/cli/coverage.html
+apps/cli/coverage.out

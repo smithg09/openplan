@@ -70,7 +70,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(os.Stderr, "openplan: dashboard running at %s\n", url)
 	fmt.Fprintf(os.Stderr, "openplan: press Ctrl+C to stop\n")
 
-	// Wait for signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh

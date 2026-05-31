@@ -43,6 +43,11 @@ func New() *Storage {
 	return &Storage{baseDir: base}
 }
 
+// NewWithBase creates a Storage rooted at a custom base directory (used in tests).
+func NewWithBase(base string) *Storage {
+	return &Storage{baseDir: base}
+}
+
 var nonSlugRe = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
 
 func DeriveProjectSlug(cwd string) string {
