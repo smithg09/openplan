@@ -15,7 +15,7 @@
 ![Openplan Demo](assets/openplan_demo.gif)
 
 
-**Try it now: ** Explore the live demo at **[openplan.smithgajjar.dev](https://openplan.smithgajjar.dev)**. Drag and drop any local markdown file/folder directly into the demo to annotate right into your browser.
+**Try it now:** Explore the live demo at **[openplan.smithgajjar.dev](https://openplan.smithgajjar.dev)**. Drag and drop any local markdown file/folder directly into the demo to annotate right into your browser.
 
 ---
 
