@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">Openplan</h1>
   <p align="center">
-    Interactive plan review for Claude Code — review, annotate, and version plans in a browser UI.
+    Interactive plan review for Claude Code - review and annotate plans in a browser.
   </p>
 </p>
 
@@ -11,8 +11,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/smithg09/openplan" alt="License"></a>
 </p>
 
-<!-- demo gif placeholder: replace with an actual recording -->
-<!-- ![Openplan Demo](https://raw.githubusercontent.com/smithg09/openplan/main/.github/assets/demo.gif) -->
+---
+
+![Openplan Demo](assets/openplan_demo.gif)
+
+---
+
+> **Try it now**
+> Explore the live demo at **[openplan.smithgajjar.dev](https://openplan.smithgajjar.dev)**. Drag and drop any local markdown file/folder directly into the demo to annotate right into your browser.
 
 ---
 
@@ -74,8 +80,6 @@ Restart Claude Code. The next time you use plan mode, Openplan will intercept th
 | `openplan serve` | Start the persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
 | `openplan sessions` | List active openplan sessions |
-| `openplan config` | Open settings UI in the browser |
-| `openplan share <file>` | Share a plan via a shareable URL |
 
 ## Storage
 
