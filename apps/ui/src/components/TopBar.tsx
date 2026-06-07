@@ -101,7 +101,9 @@ export const TopBar: React.FC<TopBarProps> = ({ onPrint, onExport, onDownload })
   return (
     <div className="op-topbar">
       <div className="op-topbar-left">
-        <Wordmark />
+        <a href="https://openplan.smithgajjar.dev" target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Wordmark />
+        </a>
         <div className="op-topbar-divider" />
         <span className="op-plan-title">{title}</span>
         {/*<Bracket color={hasEdits ? 'var(--warning)' : undefined}>
