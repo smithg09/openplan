@@ -96,7 +96,7 @@ export default function DemoSection() {
             <span className="tbd" style={{ background: '#ff5f56' }} />
             <span className="tbd" style={{ background: '#ffbd2e' }} />
             <span className="tbd" style={{ background: '#27c93f' }} />
-            <span className="tbt">Welcome to OpenPlan — plan review</span>
+            <span className="tbt">Welcome to OpenPlan · plan review</span>
             <button
               className="tbp"
               style={{ cursor: 'pointer' }}
@@ -181,8 +181,8 @@ export default function DemoSection() {
               <div className="dot">{decision === 'approved' ? 'Plan approved' : 'Changes requested'}</div>
               <div className="dos">
                 {decision === 'approved'
-                  ? 'Decision returned to agent — execution begins'
-                  : 'Feedback sent — awaiting revised plan'}
+                  ? 'Decision sent back to the agent'
+                  : 'Feedback sent, waiting for revised plan'}
               </div>
               <button className="dor" onClick={reset}>↩ reset demo</button>
             </div>

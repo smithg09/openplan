@@ -58,7 +58,7 @@ export const SessionComplete: React.FC<SessionCompleteProps> = ({ flow, onCancel
         <div className="op-session-sub">
           {phase === 'submitting' && `POST /api/${decision === 'approve' ? 'approve' : 'deny'} → openplan server…`}
           {phase === 'countdown' && 'Claude has received your decision. Closing in…'}
-          {phase === 'closeFailed' && 'Claude has received your decision. Browser blocked auto-close — you can close this tab safely.'}
+          {phase === 'closeFailed' && 'Claude has received your decision. Browser blocked auto-close. You can close this tab safely.'}
         </div>
 
         {phase === 'countdown' && (

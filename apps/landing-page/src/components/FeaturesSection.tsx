@@ -33,17 +33,17 @@ const features = [
   },
   {
     name: 'Claude Code plugin',
-    desc: 'One-line install via the plugin marketplace. Hooks register automatically — no manual config.',
+    desc: 'One-line install via the plugin marketplace. Hooks register automatically, no manual config.',
     current: true,
   },
   {
     name: 'Plan sharing',
-    desc: 'Share any plan via encrypted URL — data lives in the link itself, no server needed.',
+    desc: 'Share any plan via encrypted URL. Data lives in the link itself, no server needed.',
     current: false,
   },
   {
     name: 'More harnesses',
-    desc: 'Codex, VS Code Copilot, Antigravity CLI and more — one annotation layer across all your agents.',
+    desc: 'Codex, VS Code Copilot, Antigravity CLI and more.',
     current: false,
   },
   {
@@ -86,10 +86,9 @@ export default function FeaturesSection() {
       <div className="wrap">
         <div className="sc">
           <div className="slabel">// everything openplan does</div>
-          <h2 className="stitle">Built for the whole annotation workflow</h2>
+          <h2 className="stitle">What you get</h2>
           <p className="ssub">
-            Commands, features, and skills — available today and on the roadmap.
-            No native harness integration yet? Use skills directly in agent chat.
+            Commands, features, and skills available today and on the roadmap.
           </p>
         </div>
 

@@ -33,7 +33,7 @@ export default function App() {
 
   // Update browser title when plan title changes
   React.useEffect(() => {
-    document.title = title ? `${title} — openplan` : 'openplan';
+    document.title = title ? `${title} | openplan` : 'openplan';
   }, [title]);
 
   const [binVersion, setBinVersion] = React.useState('');

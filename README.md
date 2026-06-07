@@ -21,7 +21,7 @@
 
 ## What is Openplan?
 
-Openplan hooks into Claude Code's **plan mode** workflow. When Claude finishes planning and triggers `ExitPlanMode`, Openplan intercepts the event, opens the plan in a rich browser UI, and lets you **review, annotate, and version** the plan before sending your approve or deny decision back to Claude Code — all without leaving your terminal.
+Openplan hooks into Claude Code's **plan mode** workflow. When Claude finishes planning and triggers `ExitPlanMode`, Openplan intercepts the event, opens the plan in a browser UI, and lets you **review, annotate, and version** the plan before sending your approve or deny decision back to Claude Code.
 
 ## Installation
 
@@ -38,11 +38,11 @@ Then register the hooks automatically via the Claude Code plugin marketplace:
 /plugin install openplan@openplan
 ```
 
-Restart Claude Code and you're ready to go — no manual hook configuration needed.
+Restart Claude Code and you're ready to go. No manual hook configuration needed.
 
 ## Hook Configuration
 
-> **Note:** If you used the **plugin marketplace** (Option 1), hooks are already registered — skip this section.
+> **Note:** If you used the **plugin marketplace** (Option 1), hooks are already registered. Skip this section.
 
 For Option 2 or 3, add the following to your `~/.claude/settings.json` (or your project's `.claude/settings.json`):
 
@@ -72,8 +72,8 @@ Restart Claude Code. The next time you use plan mode, Openplan will intercept th
 
 | Command | Description |
 |---------|-------------|
-| `openplan` | Hook mode — reads ExitPlanMode event from stdin, opens browser UI, returns decision |
-| `openplan context` | PreToolUse hook — injects additional planning context |
+| `openplan` | Hook mode: reads ExitPlanMode event from stdin, opens browser UI, returns decision |
+| `openplan context` | PreToolUse hook: injects additional planning context |
 | `openplan serve` | Start the persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
 | `openplan sessions` | List active openplan sessions |
@@ -129,7 +129,7 @@ bun run dev:ui
 bun run typecheck
 ```
 
-> **Note:** The UI must be built before the CLI — the Go binary embeds `apps/cli/internal/server/ui/dist/` at compile time.
+> **Note:** The UI must be built before the CLI. The Go binary embeds `apps/cli/internal/server/ui/dist/` at compile time.
 
 ## License
 

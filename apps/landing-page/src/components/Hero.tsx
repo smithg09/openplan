@@ -19,28 +19,28 @@ const HARNESSES = [
     label: 'Codex',
     iconSrc: '/assets/icon-codex.png',
     current: false,
-    steps: ['Support for Codex — coming soon'],
+    steps: ['Codex support coming soon'],
   },
   {
     id: 'copilot',
     label: 'Copilot',
     iconSrc: '/assets/icon-copilot.svg',
     current: false,
-    steps: ['Support for Copilot — coming soon'],
+    steps: ['Copilot support coming soon'],
   },
   {
     id: 'antigravity',
     label: 'Antigravity CLI',
     iconSrc: '/assets/icon-antigravity-color.png',
     current: false,
-    steps: ['Support for Antigravity CLI — coming soon'],
+    steps: ['Antigravity CLI support coming soon'],
   },
   {
     id: 'vscode',
     label: 'VS Code',
     iconSrc: '/assets/icon-vscode.svg',
     current: false,
-    steps: ['Support for VS Code — coming soon'],
+    steps: ['VS Code support coming soon'],
   },
 ];
 
@@ -69,7 +69,7 @@ export default function Hero() {
     <div className="hero">
       <div className="hbadge">
         <span className="bdot" />
-        v0.1.0 — Now in early access
+        v0.1.0 · Early access
       </div>
 
       <h1 className="hh1">
@@ -78,8 +78,8 @@ export default function Hero() {
       </h1>
 
       <p className="hsub">
-        Openplan intercepts your agent's plan step, opens it in a rich browser UI,
-        and waits for your annotated approve or deny — before a single line of code is written.
+        Openplan intercepts your agent's plan step, opens it in a browser UI,
+        and lets you annotate, approve, or deny before any code is written.
       </p>
 
       {/* Harness switcher */}

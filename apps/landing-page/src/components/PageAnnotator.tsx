@@ -216,7 +216,7 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
         selectedText: 'annotate',
         from: 0,
         to: 0,
-        body: 'Leaving context-specific comments directly on the text makes plan review so much faster.',
+        body: 'Leaving context-specific comments directly on the text makes plan review faster.',
         author: 'Reviewer',
         createdAt: now,
         resolved: false,
@@ -224,11 +224,11 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
       {
         id: 'page_predefined_2',
         type: 'suggestion',
-        selectedText: 'before a single line of code is written.',
+        selectedText: 'before any code is written',
         from: 0,
         to: 0,
-        suggestion: 'before any code is written.',
-        body: 'Keep it concise.',
+        suggestion: 'before a single line is written',
+        body: 'More emphasis?',
         author: 'Developer',
         createdAt: now,
         resolved: false,
@@ -236,10 +236,10 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
       {
         id: 'page_predefined_3',
         type: 'deletion',
-        selectedText: 'annotated',
+        selectedText: 'Early access',
         from: 0,
         to: 0,
-        body: 'We can delete "annotated" here to make the copy tighter. Just "approve or deny" is clear.',
+        body: 'We\'re stable enough, drop the label.',
         author: 'Developer',
         createdAt: now,
         resolved: false,
@@ -517,11 +517,11 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
             )}
             <span className="op-btn-label">{showHighlights ? 'Hide' : 'Show'}</span>
           </button>
- 
+
           <div className="op-floating-bar-badge" title="Active landing page annotations">
             {activeCount}
           </div>
- 
+
           {activeCount > 0 && (
             <>
               <button
@@ -532,7 +532,7 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
                 <CopyIcon />
                 <span className="op-btn-label op-btn-label-desktop-hide">Copy MD</span>
               </button>
- 
+
               <button
                 className="op-floating-bar-btn-icon danger"
                 onClick={handleClearAll}

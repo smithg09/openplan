@@ -8,8 +8,8 @@ const TrustCheck = () => (
 );
 
 const items = [
-  'Runs locally — plans never leave your machine',
-  'Free & open source — MIT License',
+  'Runs locally, plans never leave your machine',
+  'Free & open source, MIT licensed',
   'One binary, zero dependencies',
 ];
 
