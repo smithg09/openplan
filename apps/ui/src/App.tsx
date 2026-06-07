@@ -4,14 +4,14 @@ import { applyTheme } from './lib/theme';
 import { TopBar } from './components/TopBar';
 import { HookBanner } from './components/HookBanner';
 import { OutlineFilesPanel } from './components/OutlineFilesPanel';
-import { ActionBar } from './components/ActionBar';
+import { ActionBar } from '@openplan/toolbar';
 import { SessionComplete } from './components/SessionComplete';
 import { ShareDialog } from './components/ShareDialog';
 import { SettingsPanel } from './components/SettingsPanel';
 import { EmptyState } from './components/EmptyState';
 import { RequestChangesFlyup } from './components/RequestChangesFlyup';
 import { ToastStack } from './components/Primitives';
-import { PlanEditor } from './components/PlanEditor';
+import { PlanEditor } from '@openplan/plan-viewer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { AnnotationsPanel } from '@openplan/annotations';
 import type { Annotation } from '@openplan/shared';
@@ -80,7 +80,7 @@ export default function App() {
       // No backend available (e.g. static demo site) — show sample plan
       const savedAnno = localStorage.getItem('openplan:annotations:demo/welcome-to-openplan');
       const savedDraft = localStorage.getItem('openplan:draft:demo/welcome-to-openplan');
-      
+
       let annotations = [];
       if (savedAnno) {
         try {
@@ -117,7 +117,7 @@ export default function App() {
           {
             id: 'ann_demo3',
             type: 'question',
-            selectedText: 'openplan review <file.md>',
+            selectedText: 'openplan annotate <file.md>',
             from: 0,
             to: 0,
             body: 'Does this command automatically open the default web browser?',
@@ -458,6 +458,8 @@ export default function App() {
 
       {mode === 'hook' && (
         <ActionBar
+          hasEdits={hasEdits}
+          annotationsCount={annotations.filter(a => !a.resolved).length}
           onApprove={handleApprove}
           onRequestChanges={() => setShowRequestChanges(true)}
           onAskClaude={handleAskClaude}
