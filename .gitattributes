@@ -1,2 +1,3 @@
 **/*.css linguist-detectable=false
 packages/** linguist-detectable=false
+apps/landing-page/** linguist-detectable=false

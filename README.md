@@ -129,34 +129,6 @@ bun run dev:ui
 bun run typecheck
 ```
 
-### Project Structure
-
-```
-openplan/
-├── apps/
-│   ├── cli/                  # Go CLI (cobra-based)
-│   │   ├── cmd/              # Command definitions
-│   │   ├── internal/
-│   │   │   ├── config/       # Configuration
-│   │   │   ├── server/       # HTTP server + API
-│   │   │   │   └── ui/dist/  # Embedded UI (build artifact)
-│   │   │   └── storage/      # Plan versioning & persistence
-│   │   └── main.go           # Entry point
-│   ├── ui/                   # React + Vite frontend
-│   └── plugin/               # Claude Code plugin
-│       ├── hooks/            # Hook definitions (hooks.json)
-│       └── skills/           # Skill markdown files
-├── packages/                 # Shared React component packages
-│   ├── shared/
-│   ├── plan-viewer/
-│   ├── toolbar/
-│   ├── annotations/
-│   └── diff-viewer/
-├── scripts/
-│   └── install.sh            # curl installer
-└── .github/workflows/        # CI + Release automation
-```
-
 > **Note:** The UI must be built before the CLI — the Go binary embeds `apps/cli/internal/server/ui/dist/` at compile time.
 
 ## License
