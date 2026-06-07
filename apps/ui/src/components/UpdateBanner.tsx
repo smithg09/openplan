@@ -1,6 +1,6 @@
 import React from 'react';
 
-const INSTALL_CMD = 'curl -fsSL https://raw.githubusercontent.com/smithg09/openplan/main/scripts/install.sh | bash';
+const INSTALL_CMD = 'curl -fsSL https://openplan.smithgajjar.dev/install.sh | sh';
 const RELEASES_API = 'https://api.github.com/repos/smithg09/openplan/releases/latest';
 const DISMISSED_KEY = 'openplan:update-dismissed';
 
