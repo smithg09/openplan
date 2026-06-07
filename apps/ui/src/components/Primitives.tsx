@@ -117,7 +117,7 @@ export const ToastStack: React.FC<{ toasts: Array<{ id: string; text: string }>;
 export const Wordmark: React.FC = () => (
   <div className="op-wordmark">
     <span className="op-prompt">$</span>
-    {/*<span className="op-glyph">⬡</span>*/}
+    <span style={{ color: 'var(--text-faint)', opacity: 0.6, margin: '0 -2px' }}>/</span>
     <span className="op-name">openplan</span>
   </div>
 );

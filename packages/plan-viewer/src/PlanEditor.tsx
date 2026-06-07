@@ -2,6 +2,7 @@ import React from 'react';
 import { marked } from 'marked';
 import type { Annotation } from '@openplan/shared';
 import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
+import './PlanEditor.css';
 
 // ── Markdown → HTML rendering ───────────────────────────────────────────
 
@@ -263,8 +264,8 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({
         const rect = range.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
 
-        const TB_W = 360;
-        const TB_H = 36;
+        const TB_W = 168;
+        const TB_H = 40;
         let x = rect.left + rect.width / 2 - TB_W / 2;
         let y = rect.top - TB_H - 10;
         if (y < 60) y = rect.bottom + 10;

@@ -7,7 +7,10 @@ import { readFileSync } from 'fs'
 
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, './package.json'), 'utf-8'))
 
+const isGitHubPages = process.env.VITE_GITHUB_PAGES === 'true'
+
 export default defineConfig({
+  base: isGitHubPages ? '/app/' : '/',
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },

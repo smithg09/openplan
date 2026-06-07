@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@openplan/shared": "*",
-    "@openplan/toolbar": "*"
+    "@openplan/toolbar": "*",
+    "marked": "^18.0.4"
   },
   "peerDependencies": {
     "react": "^18.0.0",

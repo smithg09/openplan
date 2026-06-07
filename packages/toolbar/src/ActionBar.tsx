@@ -1,20 +1,75 @@
 import React from 'react';
-import { Button, Chevron } from './Primitives';
-import { useStore } from '../store';
 
-interface ActionBarProps {
+// ── Inlined primitives from Primitives.tsx to keep it self-contained ───────────
+
+interface ButtonProps {
+  kind?: 'ghost' | 'outline' | 'primary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  onClick?: (e: React.MouseEvent) => void;
+  disabled?: boolean;
+  kbd?: string;
+  badge?: number | string;
+  splitRight?: boolean;
+  style?: React.CSSProperties;
+  className?: string;
+  title?: string;
+  type?: 'button' | 'submit' | 'reset';
+}
+
+const Button: React.FC<ButtonProps> = ({
+  kind = 'ghost', size = 'md', icon, children, onClick, disabled, kbd, badge, splitRight, style, className, title, type = 'button',
+}) => (
+  <button
+    type={type}
+    title={title}
+    className={[
+      'op-btn',
+      `op-btn-${kind}`,
+      `op-btn-${size}`,
+      !children && icon ? 'op-btn-icon-only' : '',
+      splitRight ? 'op-btn-split-l' : '',
+      className ?? '',
+    ].filter(Boolean).join(' ')}
+    onClick={onClick}
+    disabled={disabled}
+    style={style}
+  >
+    {icon && <span className="op-btn-icon">{icon}</span>}
+    {children && <span>{children}</span>}
+    {badge !== undefined && badge !== null && (
+      <span className="op-btn-badge">{badge}</span>
+    )}
+    {kbd && <span className="op-btn-kbd">{kbd}</span>}
+  </button>
+);
+
+const Chevron: React.FC<{ dir?: 'down' | 'up' | 'left' | 'right'; size?: number }> = ({ dir = 'down', size = 10 }) => {
+  const rot = { down: 0, up: 180, right: -90, left: 90 }[dir];
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" style={{ transform: `rotate(${rot}deg)`, transition: 'transform 120ms', display: 'inline-block', flexShrink: 0 }}>
+      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+};
+
+// ── Shared ActionBar Component ───────────────────────────────────────────────
+
+export interface ActionBarProps {
+  hasEdits: boolean;
+  annotationsCount: number;
   onApprove: (mode?: string) => void;
   onRequestChanges: () => void;
   onAskClaude: (kind: string) => void;
+  alwaysEnableApprove?: boolean;
 }
 
 export const ActionBar: React.FC<ActionBarProps> = ({
-  onApprove, onRequestChanges, onAskClaude,
+  hasEdits, annotationsCount, onApprove, onRequestChanges, onAskClaude, alwaysEnableApprove = false,
 }) => {
-  const { hasEdits, annotations } = useStore();
   const [showApproveMenu, setShowApproveMenu] = React.useState(false);
   const [showAskMenu, setShowAskMenu] = React.useState(false);
-  const annotationsCount = annotations.filter(a => !a.resolved).length;
 
   React.useEffect(() => {
     if (!showApproveMenu && !showAskMenu) return;
@@ -27,6 +82,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [showApproveMenu, showAskMenu]);
+
+  const isApproveDisabled = alwaysEnableApprove ? false : annotationsCount > 0;
 
   return (
     <div className="op-actionbar">
@@ -68,12 +125,12 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       <div
         className="op-split"
         style={{ position: 'relative' }}
-        title={annotationsCount > 0 ? 'Send your annotations via Request Changes first' : undefined}
+        title={isApproveDisabled ? 'Send your annotations via Request Changes first' : undefined}
       >
-        <Button kind="primary" size="md" onClick={() => onApprove()} kbd="⌘↵" splitRight disabled={annotationsCount > 0}>
+        <Button kind="primary" size="md" onClick={() => onApprove()} kbd="⌘↵" splitRight disabled={isApproveDisabled}>
           {hasEdits ? 'approve with edits' : 'approve'}
         </Button>
-        <Button kind="primary" size="md" onClick={() => setShowApproveMenu(s => !s)} style={{ padding: '0 8px' }} disabled={annotationsCount > 0}>
+        <Button kind="primary" size="md" onClick={() => setShowApproveMenu(s => !s)} style={{ padding: '0 8px' }} disabled={isApproveDisabled}>
           <Chevron dir="up" size={9} />
         </Button>
         {showApproveMenu && (

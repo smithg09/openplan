@@ -25,7 +25,9 @@
   ],
   "scripts": {
     "dev:ui": "bun run --cwd apps/ui dev",
+    "dev:landing": "bun run --cwd apps/landing-page dev",
     "build:ui": "bun run --cwd apps/ui build",
+    "build:landing": "bun run --cwd apps/landing-page build",
     "build:cli": "cd apps/cli && go build -o ../../bin/openplan .",
     "build": "bun run build:ui && bun run build:cli",
     "lint": "turbo lint",
