@@ -13,19 +13,19 @@ function makeInitialAnnotations(): Annotation[] {
     {
       id: 'q1', type: 'question',
       selectedText: 'annotate, version, review, and manage',
-      from: 0, to: 37, author: 'you', createdAt: now, resolved: false,
+      from: 0, to: 37, author: 'admin', createdAt: now, resolved: false,
       body: 'Should we add a shareable link feature for external reviewers?',
     },
     {
       id: 'a1', type: 'comment',
       selectedText: 'Interactive Annotations',
-      from: 0, to: 22, author: 'you', createdAt: now, resolved: false,
+      from: 0, to: 22, author: 'admin', createdAt: now, resolved: false,
       body: 'We should highlight the diff viewer feature here too.',
     },
     {
       id: 's1', type: 'suggestion',
       selectedText: 'openplan annotate <file.md>',
-      from: 0, to: 25, author: 'you', createdAt: now, resolved: false,
+      from: 0, to: 25, author: 'admin', createdAt: now, resolved: false,
       body: 'Support glob patterns for reviewing multiple files at once.',
       suggestion: 'openplan annotate <file.md|glob>',
     },

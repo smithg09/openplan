@@ -82,6 +82,11 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
           {meta.label}
         </span>
         <div style={{ flex: 1 }} />
+        {anno.author && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', marginRight: 4 }}>
+            @{anno.author}
+          </span>
+        )}
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-faint)' }}>
           {relTime(anno.createdAt)}
         </span>

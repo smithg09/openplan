@@ -13,6 +13,11 @@ const commands = [
     soon: false,
   },
   {
+    cmd: 'openplan share <file>',
+    desc: 'Generate a shareable browser link for any plan. Recipients can view and annotate — no install needed.',
+    soon: false,
+  },
+  {
     cmd: 'openplan serve',
     desc: 'Start a persistent dashboard to browse, search, and re-open all saved plans.',
     soon: true,
@@ -38,8 +43,8 @@ const features = [
   },
   {
     name: 'Plan sharing',
-    desc: 'Share any plan via encrypted URL. Data lives in the link itself, no server needed.',
-    current: false,
+    desc: 'Share any plan via a self-contained URL. Data lives in the link itself — no server, no account.',
+    current: true,
   },
   {
     name: 'More harnesses',
@@ -73,6 +78,11 @@ const skills = [
   {
     cmd: '/openplan-archive',
     desc: 'Archive the current plan to ~/.openplan/plans/ for later review.',
+    current: true,
+  },
+  {
+    cmd: '/openplan-share',
+    desc: 'Generate a shareable link for any plan file and copy it to the clipboard.',
     current: true,
   },
 ];
