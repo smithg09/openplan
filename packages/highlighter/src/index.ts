@@ -113,7 +113,7 @@ function wrapRangeWithMark(range: Range, id: string, className: string, onClick?
   while ((walkNode = walker.nextNode() as Text | null)) {
     if (range.intersectsNode(walkNode)) {
       const text = walkNode.textContent || '';
-      if (/^\s*$/.test(text) && text.includes('\n')) continue;
+      if (/^\s*$/.test(text)) continue;
       const start = walkNode === range.startContainer ? range.startOffset : 0;
       const end = walkNode === range.endContainer ? range.endOffset : walkNode.length;
       if (end > start) textNodes.push({ node: walkNode, start, end });
@@ -131,6 +131,43 @@ function wrapRangeWithMark(range: Range, id: string, className: string, onClick?
       if (onClick) mark.addEventListener('click', (e) => { e.stopPropagation(); onClick(id); });
     } catch { /* surroundContents can fail on partial nodes */ }
   });
+}
+
+function trimRangeEnd(range: Range): Range {
+  const r = range.cloneRange();
+
+  const prevTextNode = (node: Node): Text | null => {
+    // Walk backwards through siblings and their descendants to find the last text node
+    let cur: Node | null = node;
+    while (cur) {
+      const prev = cur.previousSibling;
+      if (prev) {
+        if (prev.nodeType === Node.TEXT_NODE) return prev as Text;
+        // Descend into last text node of element
+        const walker = document.createTreeWalker(prev, NodeFilter.SHOW_TEXT);
+        let last: Text | null = null;
+        let n: Text | null;
+        while ((n = walker.nextNode() as Text | null)) last = n;
+        if (last) return last;
+        cur = prev;
+      } else {
+        cur = cur.parentNode;
+      }
+    }
+    return null;
+  };
+
+  while (r.toString().length > 0 && /\s$/.test(r.toString())) {
+    const offset = r.endOffset;
+    if (offset > 0) {
+      r.setEnd(r.endContainer, offset - 1);
+    } else {
+      const prev = prevTextNode(r.endContainer);
+      if (!prev) break;
+      r.setEnd(prev, prev.length);
+    }
+  }
+  return r;
 }
 
 // ── Hook ────────────────────────────────────────────────────────────────────
@@ -178,6 +215,11 @@ export function useHighlighter(
     const h = highlighterRef.current;
     if (!h) return Promise.resolve(null);
 
+    // Trim trailing whitespace/newlines from the range end.
+    // The browser often includes a trailing \n text node (between </p> and <pre>)
+    // when the user double-clicks or drags to the end of a block element.
+    const trimmedRange = trimRangeEnd(range);
+
     return new Promise(resolve => {
       // Safety timeout: if fromRange fails silently, resolve with null so callers don't hang
       const timeout = setTimeout(() => {
@@ -196,7 +238,7 @@ export function useHighlighter(
       h.on(Highlighter.event.CREATE, handler);
 
       try {
-        h.fromRange(range);
+        h.fromRange(trimmedRange);
       } catch {
         clearTimeout(timeout);
         h.off(Highlighter.event.CREATE, handler);
@@ -248,6 +290,8 @@ export function useHighlighter(
           if (live.length) {
             libraryIdsRef.current.add(ann.id);
             live.forEach(el => {
+              // Unwrap marks that contain only whitespace (newlines between block elements)
+              if (/^\s*$/.test(el.textContent ?? '')) { unwrapMark(el); return; }
               (el as HTMLElement).dataset.bindId = ann.id;
               el.addEventListener('click', (e) => { e.stopPropagation(); onClick(ann.id); });
             });
@@ -283,6 +327,7 @@ export function useHighlighter(
         if (live.length) {
           libraryIdsRef.current.add(id);
           live.forEach(el => {
+            if (/^\s*$/.test(el.textContent ?? '')) { unwrapMark(el); return; }
             (el as HTMLElement).dataset.bindId = id;
             if (onClick) el.addEventListener('click', (e) => { (e as MouseEvent).stopPropagation(); onClick(id); });
           });
