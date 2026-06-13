@@ -1,5 +1,5 @@
 {
-  "name": "@openplan/plan-viewer",
+  "name": "@openplan/highlighter",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -8,18 +8,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openplan/highlighter": "*",
-    "@openplan/shared": "*",
-    "@openplan/toolbar": "*",
-    "marked": "^18.0.4"
+    "web-highlighter": "^0.7.4"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "^18.0.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.17",
-    "@types/react-dom": "^18.3.5",
     "typescript": "^5.7.3"
   }
 }

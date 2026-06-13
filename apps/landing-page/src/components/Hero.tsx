@@ -69,7 +69,7 @@ export default function Hero() {
     <div className="hero">
       <div className="hbadge">
         <span className="bdot" />
-        v0.1.0 · Early access
+        v0.2.0 · Early access
       </div>
 
       <h1 className="hh1">
