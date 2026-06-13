@@ -149,6 +149,13 @@ export interface ProjectSummary {
   plans: PlanMeta[];
 }
 
+export interface SharePayload {
+  version: 1;
+  title: string;
+  plan: string;
+  annotations: Annotation[];
+}
+
 export interface SessionRecord {
   pid: number;
   port: number;

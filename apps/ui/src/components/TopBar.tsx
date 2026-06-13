@@ -27,17 +27,20 @@ const ExtLinkIcon = () => <svg width="10" height="10" viewBox="0 0 10 10" fill="
 
 // ── Options menu ─────────────────────────────────────────────────────────────
 
+const UserIcon = () => <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"><circle cx="6.5" cy="4.5" r="2" /><path d="M2 11c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" /></svg>;
+
 interface OptionsMenuProps {
   theme: Theme;
   onSetTheme: (t: Theme) => void;
   onPrint: () => void;
   onExport: (fmt: string) => void;
   onDownload: () => void;
+  onChangeName: () => void;
   onClose: () => void;
 }
 
 const OptionsMenu: React.FC<OptionsMenuProps> = ({
-  theme, onSetTheme, onPrint, onExport, onDownload, onClose,
+  theme, onSetTheme, onPrint, onExport, onDownload, onChangeName, onClose,
 }) => (
   <div className="op-menu" style={{ top: '100%', right: 0, marginTop: 4, minWidth: 240 }} onClick={e => e.stopPropagation()}>
     <div className="op-menu-head">// theme</div>
@@ -63,12 +66,16 @@ const OptionsMenu: React.FC<OptionsMenuProps> = ({
     <a className="op-menu-item op-menu-link" href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" onClick={onClose}>
       <GitHubIcon /><span>GitHub repo</span><ExtLinkIcon />
     </a>
-    {/* <a className="op-menu-item op-menu-link" href="https://openplan.smithgajjar.dev" target="_blank" rel="noreferrer" onClick={onClose}>
+     <a className="op-menu-item op-menu-link" href="https://openplan.smithgajjar.dev" target="_blank" rel="noreferrer" onClick={onClose}>
       <GlobeIcon /><span>openplan.smithgajjar.dev</span><ExtLinkIcon />
-    </a> */}
+    </a>
     {/* <a className="op-menu-item op-menu-link" href="https://openplan.smithgajjar.dev/docs" target="_blank" rel="noreferrer" onClick={onClose}>
       <BookIcon /><span>Documentation</span><ExtLinkIcon />
     </a> */}
+    <div className="op-menu-divider" />
+    <button className="op-menu-item" onClick={() => { onClose(); onChangeName(); }}>
+      <UserIcon /><span>Change name</span>
+    </button>
     <div className="op-menu-divider" />
     <div className="op-menu-foot">
       <span className="op-mono" style={{ fontSize: 10, color: 'var(--text-faint)' }}>openplan v{__APP_VERSION__}</span>
@@ -82,9 +89,11 @@ interface TopBarProps {
   onPrint?: () => void;
   onExport?: (fmt: string) => void;
   onDownload?: () => void;
+  onShare?: () => void;
+  onChangeName?: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onPrint, onExport, onDownload }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onPrint, onExport, onDownload, onShare, onChangeName }) => {
   const { mode, title, version, project, hasEdits, savedAgo, theme, setTheme } = useStore();
   const [optionsMenu, setOptionsMenu] = React.useState(false);
 
@@ -118,6 +127,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onPrint, onExport, onDownload })
 
       <div className="op-topbar-right">
         {hasEdits && <SavedPill savedAgo={savedAgo} />}
+        {onShare && (
+          <button
+            className="op-btn op-btn-ghost op-btn-sm"
+            onClick={onShare}
+            title="Share plan"
+            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            <ShareIcon /><span style={{ fontSize: 11.5 }}>share</span>
+          </button>
+        )}
         <div style={{ position: 'relative' }}>
           <button
             className="op-btn op-btn-ghost op-btn-md op-btn-icon-only op-options-trigger"
@@ -133,6 +152,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onPrint, onExport, onDownload })
               onPrint={onPrint ?? (() => { })}
               onExport={onExport ?? (() => { })}
               onDownload={onDownload ?? (() => { })}
+              onChangeName={onChangeName ?? (() => { })}
               onClose={() => setOptionsMenu(false)}
             />
           )}

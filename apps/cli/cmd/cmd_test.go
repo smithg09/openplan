@@ -2,10 +2,7 @@ package cmd
 
 import (
 	"bytes"
-	crand "crypto/rand"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -168,58 +165,6 @@ func TestListMarkdownFiles_Nested(t *testing.T) {
 	}
 }
 
-// ── postToRelay ───────────────────────────────────────────────────────────
-
-func TestPostToRelay_Success(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/relay/store" {
-			http.Error(w, "not found", 404)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token": "abc123"})
-	}))
-	defer srv.Close()
-
-	token, err := postToRelay(srv.URL, "encoded-content")
-	if err != nil {
-		t.Fatalf("postToRelay: %v", err)
-	}
-	if token != "abc123" {
-		t.Errorf("token = %q, want abc123", token)
-	}
-}
-
-func TestPostToRelay_ServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "internal error", 500)
-	}))
-	defer srv.Close()
-
-	_, err := postToRelay(srv.URL, "content")
-	if err == nil {
-		t.Error("expected error on server 500")
-	}
-}
-
-func TestPostToRelay_EmptyToken(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"token": ""})
-	}))
-	defer srv.Close()
-
-	_, err := postToRelay(srv.URL, "content")
-	if err == nil {
-		t.Error("expected error when relay returns empty token")
-	}
-}
-
-func TestPostToRelay_BadURL(t *testing.T) {
-	_, err := postToRelay("http://127.0.0.1:1", "content")
-	if err == nil {
-		t.Error("expected error on unreachable server")
-	}
-}
 
 // ── mustGetwd ─────────────────────────────────────────────────────────────
 
@@ -258,67 +203,49 @@ func TestSetVersion(t *testing.T) {
 
 // ── runShare ──────────────────────────────────────────────────────────────
 
-func TestRunShare_InlineURL(t *testing.T) {
-	// Write a small file (will be inline, no relay needed)
-	dir := t.TempDir()
-	file := filepath.Join(dir, "plan.md")
-	os.WriteFile(file, []byte("# Small Plan\nshort content"), 0644)
-
-	// Capture stdout
+func captureStdout(fn func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
-
-	err := runShare(file)
+	fn()
 	w.Close()
 	os.Stdout = old
-
 	var buf bytes.Buffer
 	buf.ReadFrom(r)
+	return buf.String()
+}
+
+func TestRunShare_URLFormat(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "plan.md")
+	os.WriteFile(file, []byte("# My Plan\nsome content here"), 0644)
+
+	var err error
+	out := captureStdout(func() { err = runShare(file) })
 
 	if err != nil {
 		t.Fatalf("runShare: %v", err)
 	}
-	out := strings.TrimSpace(buf.String())
-	if !strings.HasPrefix(out, "https://openplan.smithgajjar.dev/#") {
-		t.Errorf("unexpected URL: %q", out)
+	if !strings.Contains(out, "https://openplan.smithgajjar.dev/app#share?hash=") {
+		t.Errorf("expected share URL in output, got:\n%s", out)
 	}
 }
 
-func TestRunShare_RelayURL(t *testing.T) {
-	// Set up a fake relay server
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"token": "relay-tok-123"})
-	}))
-	defer srv.Close()
-	t.Setenv("OPENPLAN_RELAY_URL", srv.URL)
-
-	// Write a large file using crypto/rand to force relay path (> 30KB encoded after gzip)
+func TestRunShare_TitleFromHeading(t *testing.T) {
 	dir := t.TempDir()
-	file := filepath.Join(dir, "big.md")
-	randData := make([]byte, 100*1024) // 100KB of random bytes won't compress to < 30KB
-	if _, err := crand.Read(randData); err != nil {
-		t.Fatalf("generating random data: %v", err)
+	file := filepath.Join(dir, "plan.md")
+	os.WriteFile(file, []byte("# My Great Plan\nsome content"), 0644)
+
+	title := deriveTitleFromContent("# My Great Plan\nsome content", file)
+	if title != "My Great Plan" {
+		t.Errorf("expected %q, got %q", "My Great Plan", title)
 	}
-	os.WriteFile(file, randData, 0644)
+}
 
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := runShare(file)
-	w.Close()
-	os.Stdout = old
-
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-
-	if err != nil {
-		t.Fatalf("runShare large: %v", err)
-	}
-	out := strings.TrimSpace(buf.String())
-	if !strings.Contains(out, "relay-tok-123") {
-		t.Errorf("expected relay token in URL, got %q", out)
+func TestRunShare_TitleFallsBackToFilename(t *testing.T) {
+	title := deriveTitleFromContent("no heading here", "/some/path/my-plan.md")
+	if title != "my-plan" {
+		t.Errorf("expected %q, got %q", "my-plan", title)
 	}
 }
 
@@ -326,5 +253,21 @@ func TestRunShare_FileNotFound(t *testing.T) {
 	err := runShare("/nonexistent/file.md")
 	if err == nil {
 		t.Error("expected error for missing file")
+	}
+}
+
+func TestRunShare_FriendlyMessage(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "plan.md")
+	os.WriteFile(file, []byte("# Plan\ncontent"), 0644)
+
+	var err error
+	out := captureStdout(func() { err = runShare(file) })
+
+	if err != nil {
+		t.Fatalf("runShare: %v", err)
+	}
+	if !strings.Contains(out, "collaborators") {
+		t.Errorf("expected friendly message in output, got:\n%s", out)
 	}
 }

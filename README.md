@@ -74,9 +74,37 @@ Restart Claude Code. The next time you use plan mode, Openplan will intercept th
 |---------|-------------|
 | `openplan` | Hook mode: reads ExitPlanMode event from stdin, opens browser UI, returns decision |
 | `openplan context` | PreToolUse hook: injects additional planning context |
-| `openplan serve` | Start the persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
+| `openplan share <file>` | Generate a shareable browser link for any plan |
+| `openplan serve` | Start the persistent dashboard server |
 | `openplan sessions` | List active openplan sessions |
+
+## Sharing Plans
+
+`openplan share` generates a self-contained URL that encodes the full plan content. Recipients can open the link in any browser to read the plan and add annotations — no account or installation required.
+
+```bash
+openplan share my-plan.md
+```
+
+```
+  ✓ Share link generated
+
+  https://openplan.smithgajjar.dev/app#share?hash=...
+
+  Send this link to collaborators — they can view the plan and
+  add annotations directly in the browser. No account required.
+```
+
+The link is also copied to your clipboard automatically.
+
+You can also share from agent chat using the `/openplan-share` skill:
+
+```
+/openplan-share path/to/plan.md
+```
+
+The URL is entirely self-contained — all plan data is encoded directly in the link using gzip compression. No server stores your content.
 
 ## Storage
 

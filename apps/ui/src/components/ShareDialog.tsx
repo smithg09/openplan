@@ -1,26 +1,47 @@
 import React from 'react';
 import { Button } from './Primitives';
+import type { Annotation } from '@openplan/shared';
+import { encodeSharePayload } from '../lib/share';
 
 interface ShareDialogProps {
+  plan: string;
+  annotations: Annotation[];
+  title: string;
   onClose: () => void;
 }
 
-export const ShareDialog: React.FC<ShareDialogProps> = ({ onClose }) => {
-  const [include, setInclude] = React.useState('all');
-  const [copied, setCopied] = React.useState(false);
-  const url = 'https://openplan.smithgajjar.dev/#Ab3Xy7P9k2Mn4qR8wL1cT5vYzU0o';
+const BASE_URL = 'https://openplan.smithgajjar.dev/app';
 
-  const copy = () => {
-    navigator.clipboard?.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
-  };
+export const ShareDialog: React.FC<ShareDialogProps> = ({ plan, annotations, title, onClose }) => {
+  const [include, setInclude] = React.useState('all');
+  const [url, setUrl] = React.useState('');
+  const [copied, setCopied] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const filtered =
+      include === 'plan' ? [] :
+      include === 'resolved' ? annotations.filter(a => a.resolved) :
+      annotations;
+
+    encodeSharePayload({ version: 1, title, plan, annotations: filtered }).then(hash => {
+      if (!cancelled) setUrl(BASE_URL + hash);
+    });
+    return () => { cancelled = true; };
+  }, [include, plan, annotations, title]);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  const copy = () => {
+    if (!url) return;
+    navigator.clipboard?.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
 
   return (
     <div className="op-overlay" onClick={onClose}>
@@ -55,7 +76,9 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ onClose }) => {
             borderRadius: 5, padding: '0 0 0 10px',
             fontFamily: 'var(--font-mono)', fontSize: 11.5,
           }}>
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{url}</span>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: url ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+              {url || 'generating…'}
+            </span>
             <Button kind="ghost" size="sm" onClick={copy} style={{ borderLeft: '1px solid var(--border)', borderRadius: 0 }}>
               {copied ? 'copied ✓' : 'copy'}
             </Button>
@@ -70,7 +93,6 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ onClose }) => {
           </div>
         </div>
         <div className="op-modal-foot">
-          <Button kind="ghost" size="md">regenerate</Button>
           <div className="op-grow" />
           <Button kind="outline" size="md" onClick={onClose}>close</Button>
         </div>

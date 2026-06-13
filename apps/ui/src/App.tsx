@@ -7,6 +7,7 @@ import { OutlineFilesPanel } from './components/OutlineFilesPanel';
 import { ActionBar } from '@openplan/toolbar';
 import { SessionComplete } from './components/SessionComplete';
 import { ShareDialog } from './components/ShareDialog';
+import { IdentityModal } from './components/IdentityModal';
 import { SettingsPanel } from './components/SettingsPanel';
 import { EmptyState } from './components/EmptyState';
 import { RequestChangesFlyup } from './components/RequestChangesFlyup';
@@ -15,6 +16,9 @@ import { PlanEditor } from '@openplan/plan-viewer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { AnnotationsPanel } from '@openplan/annotations';
 import type { Annotation } from '@openplan/shared';
+import { getAuthor, setAuthor } from './lib/identity';
+import { isShareMode } from './lib/mode';
+import { decodeSharePayload } from './lib/share';
 
 export default function App() {
   const {
@@ -37,9 +41,50 @@ export default function App() {
   }, [title]);
 
   const [binVersion, setBinVersion] = React.useState('');
+  const [author, setAuthorState] = React.useState<string>(() => getAuthor() ?? '');
+  const [showIdentity, setShowIdentity] = React.useState(false);
+  const pendingAnnotationRef = React.useRef<Omit<Annotation, 'id' | 'createdAt' | 'resolved'> | null>(null);
+
+  const handleAddAnnotation = (ann: Omit<Annotation, 'id' | 'createdAt' | 'resolved'>) => {
+    const currentAuthor = getAuthor();
+    if (!currentAuthor) {
+      pendingAnnotationRef.current = ann;
+      setShowIdentity(true);
+      return;
+    }
+    addAnnotation({ ...ann, author: currentAuthor });
+  };
+
+  const handleIdentityConfirm = (name: string) => {
+    setAuthor(name);
+    setAuthorState(name);
+    setShowIdentity(false);
+    if (pendingAnnotationRef.current) {
+      addAnnotation({ ...pendingAnnotationRef.current, author: name });
+      pendingAnnotationRef.current = null;
+    }
+  };
 
   // ── Startup: fetch all data from API ──────────────────────────────────
   React.useEffect(() => {
+    // Share mode: decode payload from URL hash, skip API
+    if (isShareMode()) {
+      decodeSharePayload(window.location.hash).then(payload => {
+        initializeFromAPI({
+          mode: 'share',
+          plan: payload.plan,
+          title: payload.title,
+          slug: 'shared',
+          project: 'shared',
+          annotations: payload.annotations,
+        });
+        if (!getAuthor()) setShowIdentity(true);
+      }).catch(() => {
+        initializeFromAPI({ mode: 'share', plan: '# Error\n\nFailed to decode shared plan.', title: 'Error', slug: 'error', project: 'shared', annotations: [] });
+      });
+      return;
+    }
+
     setLoading(true);
     Promise.all([
       fetch('/api/config').then(r => r.json()),
@@ -380,8 +425,18 @@ export default function App() {
   return (
     <div className="op-app">
       {mode === 'hook' && <HookBanner timer={timer} />}
+      {isShare && (
+        <div style={{
+          padding: '5px 16px', background: 'color-mix(in oklab, var(--accent) 12%, var(--bg-base))',
+          borderBottom: '1px solid var(--border)', fontFamily: 'var(--font-mono)',
+          fontSize: 11.5, color: 'var(--text-secondary)', textAlign: 'center',
+        }}>
+          // share mode
+        </div>
+      )}
 
       <TopBar
+        onShare={() => setShowShare(true)}
         onExport={fmt => {
           if (fmt === 'markdown') {
             const md = exportAnnotationsToMarkdown(annotations, plan);
@@ -405,6 +460,7 @@ export default function App() {
           });
           document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }}
+        onChangeName={() => setShowIdentity(true)}
       />
 
       <div className="op-app-body">
@@ -432,7 +488,8 @@ export default function App() {
             annotations={annotations}
             focusId={focusedAnnotationId}
             onFocusAnnotation={(id) => { setFocusedAnnotation(id); if (id) setPanelOpen(true); }}
-            onAddAnnotation={addAnnotation}
+            author={author || 'anonymous'}
+            onAddAnnotation={handleAddAnnotation}
             onRemoveAnnotation={removeAnnotation}
           />
         )}
@@ -491,7 +548,22 @@ export default function App() {
         />
       )}
 
-      {showShare && <ShareDialog onClose={() => setShowShare(false)} />}
+      {showShare && (
+        <ShareDialog
+          plan={plan}
+          annotations={annotations}
+          title={title}
+          onClose={() => setShowShare(false)}
+        />
+      )}
+      {showIdentity && (
+        <IdentityModal
+          soft={isShare}
+          initialName={author || undefined}
+          onConfirm={handleIdentityConfirm}
+          onDismiss={() => { setShowIdentity(false); pendingAnnotationRef.current = null; }}
+        />
+      )}
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
       <UpdateBanner currentVersion={binVersion} />

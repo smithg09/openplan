@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Plan sharing** — `openplan share <file>` generates a self-contained shareable URL; plan data is encoded in the link itself — no server or account required
+- **`/openplan-share` skill** — new Claude Code slash command that runs `openplan share` and surfaces the generated URL
+- **Identity modal** — reviewers opening a shared plan are prompted for a display name that appears on their annotations, stored locally in the browser
+
 ## [0.2.0] - 2026-06-13
 
 ### Added
