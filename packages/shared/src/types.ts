@@ -93,12 +93,20 @@ export type AnnotationType =
   | 'deletion'
   | 'suggestion';
 
+export interface HighlightMeta {
+  parentTagName: string;
+  parentIndex: number;
+  textOffset: number;
+}
+
 export interface Annotation {
   id: string;
   type: AnnotationType;
   selectedText: string;
   from: number;
   to: number;
+  startMeta?: HighlightMeta;
+  endMeta?: HighlightMeta;
   body?: string;
   emoji?: string;
   suggestion?: string;

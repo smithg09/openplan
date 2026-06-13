@@ -739,7 +739,7 @@ func saveToNotion(cfg *config.Config, title, content string) (string, string, er
 // handleHealthz returns a simple health check response.
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"ok":true,"version":"0.1.0"}`)
+	fmt.Fprintf(w, `{"ok":true,"version":"0.2.0"}`)
 }
 
 // spaHandler returns a handler that serves static files and falls back to
