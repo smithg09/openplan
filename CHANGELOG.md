@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-13
+
 ### Added
 
 - **Plan sharing** — `openplan share <file>` generates a self-contained shareable URL; plan data is encoded in the link itself — no server or account required
@@ -35,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session management** — `openplan sessions` lists all active openplan sessions (PID, port, mode)
 - **Claude Code plugin** — plugin manifest with hooks (`PreToolUse`, `PermissionRequest`) and skills (`openplan`, `openplan-annotate`, `openplan-archive`, `openplan-last`)
 
-[Unreleased]: https://github.com/smithg09/openplan/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/smithg09/openplan/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/smithg09/openplan/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/smithg09/openplan/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/smithg09/openplan/releases/tag/v0.1.0
