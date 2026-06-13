@@ -28,6 +28,7 @@ FILES=(
   "packages/shared/package.json"
   ".claude-plugin/marketplace.json"
 )
+CHANGELOG="CHANGELOG.md"
 
 # ---- args -------------------------------------------------------------------
 BUMP=""
@@ -92,9 +93,60 @@ bump_file() {
   perl -0pi -e 'BEGIN{$c=0} s/("version":\s*")[^"]+(")/$c++ ? "$1$2" : "${1}'"$NEW"'$2"/e' "$file"
 }
 
+update_changelog() {
+  python3 - "$CHANGELOG" "$NEW" "$CURRENT" <<'PYEOF'
+import sys, re, datetime
+
+changelog_path, new_version, old_version = sys.argv[1], sys.argv[2], sys.argv[3]
+release_date = datetime.date.today().strftime('%Y-%m-%d')
+
+with open(changelog_path, 'r') as f:
+    content = f.read()
+
+# Extract body between ## [Unreleased] and the next ## [ heading
+m = re.search(r'(?<=## \[Unreleased\]\n)(.*?)(?=\n## \[)', content, re.DOTALL)
+unreleased_body = m.group(1).strip() if m else ''
+
+# Build the new version section
+new_section = f'## [{new_version}] - {release_date}\n'
+if unreleased_body:
+    new_section += '\n' + unreleased_body + '\n'
+
+# Clear the unreleased body and insert new version section before the next heading
+content = re.sub(
+    r'(## \[Unreleased\]\n).*?(\n## \[)',
+    lambda mo: mo.group(1) + '\n' + new_section + mo.group(2),
+    content,
+    flags=re.DOTALL,
+)
+
+# Update footer links
+m = re.search(r'\[Unreleased\]:\s*(https://\S+)/compare/v[\d.]+\.\.\.HEAD', content)
+if m:
+    base_url = m.group(1)
+    content = re.sub(
+        r'\[Unreleased\]:\s*\S+',
+        f'[Unreleased]: {base_url}/compare/v{new_version}...HEAD',
+        content,
+    )
+    new_link = f'[{new_version}]: {base_url}/compare/v{old_version}...v{new_version}\n'
+    content = re.sub(
+        r'(\[Unreleased\]:[^\n]+\n)',
+        r'\1' + new_link,
+        content,
+    )
+
+with open(changelog_path, 'w') as f:
+    f.write(content)
+
+print(f"  updated {changelog_path}")
+PYEOF
+}
+
 if [[ "$DRY_RUN" == true ]]; then
   echo "[dry-run] would set version=$NEW in:"
   printf '  %s\n' "${FILES[@]}"
+  echo "[dry-run] would move CHANGELOG.md [Unreleased] content into [$NEW] - $(date +%Y-%m-%d)"
   echo "[dry-run] would commit, tag $TAG, and $([[ "$PUSH" == true ]] && echo "push" || echo "skip push")"
   exit 0
 fi
@@ -103,9 +155,10 @@ for f in "${FILES[@]}"; do
   bump_file "$f"
   echo "  updated $f"
 done
+update_changelog
 
 # ---- commit, tag, push ------------------------------------------------------
-git add "${FILES[@]}"
+git add "${FILES[@]}" "$CHANGELOG"
 git commit -m "chore: release $TAG"
 git tag -a "$TAG" -m "Release $TAG"
 echo
