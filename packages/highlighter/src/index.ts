@@ -140,7 +140,7 @@ function trimRangeEnd(range: Range): Range {
     // Walk backwards through siblings and their descendants to find the last text node
     let cur: Node | null = node;
     while (cur) {
-      const prev = cur.previousSibling;
+      const prev: ChildNode | null = cur.previousSibling;
       if (prev) {
         if (prev.nodeType === Node.TEXT_NODE) return prev as Text;
         // Descend into last text node of element
