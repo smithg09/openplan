@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-27
+
 ### Added
 
 - **GitHub Copilot CLI integration** — `openplan copilot-plan` hooks Copilot's `preToolUse` event, filters for `exit_plan_mode` calls, and opens the same visual review UI used for Claude Code
@@ -44,7 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session management** — `openplan sessions` lists all active openplan sessions (PID, port, mode)
 - **Claude Code plugin** — plugin manifest with hooks (`PreToolUse`, `PermissionRequest`) and skills (`openplan`, `openplan-annotate`, `openplan-archive`, `openplan-last`)
 
-[Unreleased]: https://github.com/smithg09/openplan/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/smithg09/openplan/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/smithg09/openplan/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/smithg09/openplan/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/smithg09/openplan/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/smithg09/openplan/releases/tag/v0.1.0
