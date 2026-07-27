@@ -1,0 +1,10 @@
+{
+  "name": "openplan-copilot",
+  "description": "Interactive plan review for GitHub Copilot CLI — annotate, version, and manage plans in a browser UI.",
+  "version": "0.2.0",
+  "author": { "name": "smithg09" },
+  "repository": "https://github.com/smithg09/openplan",
+  "license": "MIT",
+  "keywords": ["planning", "review", "hooks", "exit_plan_mode", "annotations"],
+  "hooks": "hooks.json"
+}

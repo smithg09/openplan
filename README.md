@@ -67,6 +67,32 @@ For Option 2 or 3, add the following to your `~/.claude/settings.json` (or your 
 
 Restart Claude Code. The next time you use plan mode, Openplan will intercept the `ExitPlanMode` event, open the plan in a browser, and return your approve/deny decision to Claude Code.
 
+## GitHub Copilot CLI
+
+Install the binary (same command as above), then register the hooks via Copilot CLI's plugin marketplace:
+
+```
+/plugin marketplace add smithg09/openplan
+/plugin install openplan-copilot@openplan
+```
+
+Restart Copilot CLI. Plan review activates automatically whenever you use plan mode (`Shift+Tab`).
+
+To configure manually instead, create `~/.copilot/hooks/openplan.json` (or `.github/hooks/openplan.json` in your repo):
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "bash": "openplan copilot-plan", "timeoutSec": 345600 }
+    ]
+  }
+}
+```
+
+Copilot CLI's `preToolUse` hook fires on every tool call; `openplan copilot-plan` filters for `exit_plan_mode` and reads the plan from Copilot's session state, so no matcher config is needed.
+
 
 ## Usage
 
@@ -76,6 +102,7 @@ Restart Claude Code. The next time you use plan mode, Openplan will intercept th
 | `openplan context` | PreToolUse hook: injects additional planning context |
 | `openplan serve` | Start the persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
+| `openplan copilot-plan` | Copilot CLI preToolUse hook: intercepts `exit_plan_mode`, opens browser UI, returns decision |
 | `openplan sessions` | List active openplan sessions |
 
 ## Storage

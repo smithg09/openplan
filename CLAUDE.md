@@ -10,7 +10,8 @@ openplan (root)
 │   ├── cli/              → Go CLI (cobra-based, entry: main.go)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
-│   └── plugin/           → Claude Code plugin (hooks + slash commands)
+│   ├── plugin/           → Claude Code plugin (hooks + slash commands)
+│   └── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json)
 ├── packages/             → Shared React component packages
 │   ├── shared/
 │   ├── plan-viewer/
@@ -62,6 +63,15 @@ Openplan integrates with Claude Code via two hooks:
 
 The hook reads a JSON event from stdin, processes the plan content, and returns a decision via stdout.
 
+Openplan also integrates with **GitHub Copilot CLI** via its `preToolUse` hook, which fires on
+every tool call (there's no dedicated plan-exit event in Copilot CLI): `openplan copilot-plan`
+filters for `toolName == "exit_plan_mode"`, reads the plan from Copilot's session-state
+`plan.md` (Copilot doesn't pass plan content inline in the hook payload), and returns Copilot's
+flat `{permissionDecision, permissionDecisionReason}` shape rather than Claude's
+`hookSpecificOutput` wrapper. Each agent's decision format is pluggable via the
+`server.DecisionBuilder` interface (`internal/server/server.go`), set per `Server` instance with
+`WithDecisionBuilder(...)`.
+
 ## CLI Commands
 
 | Command | Description |
@@ -70,6 +80,7 @@ The hook reads a JSON event from stdin, processes the plan content, and returns 
 | `openplan context` | PreToolUse hook — outputs additionalContext JSON |
 | `openplan serve` | Start persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open file/directory in annotation UI |
+| `openplan copilot-plan` | Copilot CLI `preToolUse` hook — filters `exit_plan_mode`, opens browser, returns decision |
 | `openplan sessions` | List active openplan sessions |
 | `openplan config` | Open settings UI in browser |
 | `openplan share <file>` | Share a plan via URL |
@@ -91,8 +102,8 @@ Defined in `apps/plugin/commands/`:
 
 | Path | Purpose |
 |------|---------|
-| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`) |
-| `internal/server/` | HTTP server, API handlers (`server.go`, `serve_server.go`, `share.go`, `hook_event.go`) |
+| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`, `copilot_plan.go`) |
+| `internal/server/` | HTTP server, API handlers (`server.go`, `serve_server.go`, `share.go`, `hook_event.go`, `copilot_event.go`) |
 | `internal/storage/` | Plan versioning & persistence |
 | `internal/config/` | Configuration management |
 | `internal/server/ui/dist/` | Embedded UI build output (gitignored) |
@@ -123,11 +134,19 @@ Defined in `apps/plugin/commands/`:
 | `hooks/hooks.json` | Claude Code hook definitions |
 | `commands/` | Slash command markdown files |
 
+### Copilot Plugin (`apps/plugin-copilot/`)
+
+| Path | Purpose |
+|------|---------|
+| `plugin.json` | Copilot CLI plugin manifest (name, version, `hooks` pointer) |
+| `hooks.json` | Copilot CLI hook definition (`preToolUse` → `openplan copilot-plan`) |
+
 ### Other
 
 | Path | Purpose |
 |------|---------|
 | `.claude-plugin/marketplace.json` | Claude Code plugin marketplace manifest |
+| `.github/plugin/marketplace.json` | Copilot CLI plugin marketplace manifest |
 | `scripts/install.sh` | Curl-based binary installer |
 | `~/.openplan/` | User data directory (plans, config, sessions, hooks) |
 

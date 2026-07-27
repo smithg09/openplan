@@ -1,0 +1,15 @@
+{
+  "name": "openplan",
+  "owner": { "name": "smithg09" },
+  "metadata": {
+    "description": "Interactive plan review for GitHub Copilot CLI"
+  },
+  "plugins": [
+    {
+      "name": "openplan-copilot",
+      "source": "./apps/plugin-copilot",
+      "description": "Interactive plan review: annotate, version, and manage Copilot CLI plans in a browser UI.",
+      "version": "0.2.0"
+    }
+  ]
+}
