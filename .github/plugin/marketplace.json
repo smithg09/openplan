@@ -9,7 +9,7 @@
       "name": "openplan-copilot",
       "source": "./apps/plugin-copilot",
       "description": "Interactive plan review: annotate, version, and manage Copilot CLI plans in a browser UI.",
-      "version": "0.2.0"
+      "version": "0.3.0"
     }
   ]
 }

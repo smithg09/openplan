@@ -360,9 +360,9 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
     if (type === 'comment' || type === 'question' || type === 'suggestion') {
       setPopover({ pos, type, quote });
     } else if (type === 'emoji' && meta?.emoji) {
-      handleAddAnnotation({ type: 'emoji', selectedText: quote, from: 0, to: 0, emoji: meta.emoji, author: 'you' });
+      handleAddAnnotation({ type: 'emoji', selectedText: quote, from: 0, to: 0, emoji: meta.emoji, author: 'admin' });
     } else {
-      handleAddAnnotation({ type: type as Annotation['type'], selectedText: quote, from: 0, to: 0, author: 'you' });
+      handleAddAnnotation({ type: type as Annotation['type'], selectedText: quote, from: 0, to: 0, author: 'admin' });
     }
   };
 

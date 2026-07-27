@@ -1,4 +1,5 @@
 import { SAMPLE_PLAN } from '@openplan/shared';
+import { isShareHash } from './share';
 export { SAMPLE_PLAN };
 export type AppMode = 'hook' | 'standalone' | 'share';
 
@@ -18,7 +19,12 @@ declare global {
   }
 }
 
+export function isShareMode(): boolean {
+  return isShareHash(window.location.hash);
+}
+
 export function getMode(): AppMode {
+  if (isShareMode()) return 'share';
   return window.__OPENPLAN_MODE__ ?? 'hook';
 }
 
@@ -35,4 +41,3 @@ export function getInitialMeta() {
     title: window.__OPENPLAN_TITLE__ ?? 'Untitled Plan',
   };
 }
-

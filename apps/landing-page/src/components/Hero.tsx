@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+
+declare const __APP_VERSION__: string;
 import { GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
 
 const HARNESSES = [
@@ -69,7 +71,7 @@ export default function Hero() {
     <div className="hero">
       <div className="hbadge">
         <span className="bdot" />
-        v0.2.0 · Early access
+        v{__APP_VERSION__} · Early access
       </div>
 
       <h1 className="hh1">

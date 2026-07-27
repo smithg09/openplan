@@ -15,6 +15,7 @@ export interface PlanEditorProps {
   plan: string;
   annotations: Annotation[];
   focusId: string | null;
+  author?: string;
   onFocusAnnotation: (id: string | null) => void;
   onAddAnnotation: (ann: Omit<Annotation, 'id' | 'createdAt' | 'resolved'>) => void;
   onRemoveAnnotation: (id: string) => void;
@@ -24,6 +25,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({
   plan, annotations,
   focusId, onFocusAnnotation,
   onAddAnnotation, onRemoveAnnotation,
+  author = 'anonymous',
 }) => {
   const [selectionState, setSelectionState] = React.useState<{
     pos: { x: number; y: number };
@@ -141,9 +143,9 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({
       pendingMetaRef.current = { startMeta, endMeta };
       setPopover({ pos: popoverPos, type, quote: source?.text ?? quote });
     } else if (type === 'emoji' && meta?.emoji) {
-      onAddAnnotation({ type: 'emoji', selectedText: source?.text ?? quote, startMeta, endMeta, from: 0, to: 0, emoji: meta.emoji, author: 'you' });
+      onAddAnnotation({ type: 'emoji', selectedText: source?.text ?? quote, startMeta, endMeta, from: 0, to: 0, emoji: meta.emoji, author });
     } else {
-      onAddAnnotation({ type: type as Annotation['type'], selectedText: source?.text ?? quote, startMeta, endMeta, from: 0, to: 0, author: 'you' });
+      onAddAnnotation({ type: type as Annotation['type'], selectedText: source?.text ?? quote, startMeta, endMeta, from: 0, to: 0, author });
     }
   };
 
@@ -156,7 +158,7 @@ export const PlanEditor: React.FC<PlanEditorProps> = ({
       startMeta, endMeta,
       from: 0, to: 0,
       body, suggestion,
-      author: 'you',
+      author,
     });
     pendingMetaRef.current = {};
     setPopover(null);
