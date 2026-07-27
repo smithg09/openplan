@@ -11,7 +11,9 @@ openplan (root)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
 │   ├── plugin/           → Claude Code plugin (hooks + slash commands)
-│   └── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json)
+│   ├── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json)
+│   ├── plugin-codex/     → Codex CLI hook config (hooks.json only, no plugin manifest format exists)
+│   └── plugin-agy/       → Antigravity CLI (agy) plugin (hooks.json + minimal plugin.json)
 ├── packages/             → Shared React component packages
 │   ├── shared/
 │   ├── plan-viewer/
@@ -72,6 +74,31 @@ flat `{permissionDecision, permissionDecisionReason}` shape rather than Claude's
 `server.DecisionBuilder` interface (`internal/server/server.go`), set per `Server` instance with
 `WithDecisionBuilder(...)`.
 
+**Codex CLI** has no plan-exit event at all — `openplan codex-plan` hooks `Stop` (end of every
+turn) and re-parses the turn's rollout transcript (`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`,
+JSONL) to find the latest plan, via `internal/server/codex_session.go`. Silently allows (no
+stdout) when the turn didn't produce a plan, so it doesn't pop a browser on every turn. When
+Codex re-fires `Stop` after a deny (`stop_hook_active: true`), the plan-diffing logic in
+`GetLatestCodexPlan` only surfaces a new decision if the plan actually changed since the last
+review — without this the Stop→deny→Stop cycle would loop.
+
+**Antigravity CLI (`agy`)** also has no plan-exit event — plan mode calls the generic
+`write_to_file` tool with `ArtifactMetadata.RequestFeedback: true` (verified against a real `agy`
+v1.1.7 session; see `internal/server/antigravity_event_test.go` for the captured payload).
+`openplan agy-plan` hooks `PreToolUse` matched to `write_to_file` and checks that flag — the
+tool name alone isn't enough, since the same tool writes ordinary code files after plan approval.
+
+Known limitation (also verified empirically): after `openplan agy-plan` denies a plan with
+feedback, `agy`'s retry doesn't reliably set `RequestFeedback: true` again on the resubmitted
+write — observed once with `RequestFeedback: false` on a retry to the same artifact path. When
+that happens, `openplan agy-plan` correctly doesn't re-intercept it (per its filter), and review
+falls through to `agy`'s own native "artifact to review" prompt instead of reopening openplan's
+UI. Deny itself is confirmed correct — the original write is blocked (no file created) and the
+model sees the reason — this is only about whether the *second* round is guaranteed to route
+through openplan again. Not fixed with a secondary heuristic (e.g. matching the artifact
+filename) because the plan filename itself varies between sessions (`hello_world_plan.md` vs.
+`implementation_plan.md` observed across two runs).
+
 ## CLI Commands
 
 | Command | Description |
@@ -81,6 +108,8 @@ flat `{permissionDecision, permissionDecisionReason}` shape rather than Claude's
 | `openplan serve` | Start persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open file/directory in annotation UI |
 | `openplan copilot-plan` | Copilot CLI `preToolUse` hook — filters `exit_plan_mode`, opens browser, returns decision |
+| `openplan codex-plan` | Codex CLI `Stop` hook — reviews a plan if the turn produced one |
+| `openplan agy-plan` | Antigravity CLI `PreToolUse` hook — filters plan-mode `write_to_file` calls |
 | `openplan sessions` | List active openplan sessions |
 | `openplan config` | Open settings UI in browser |
 | `openplan share <file>` | Share a plan via URL |
@@ -102,8 +131,8 @@ Defined in `apps/plugin/commands/`:
 
 | Path | Purpose |
 |------|---------|
-| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`, `copilot_plan.go`) |
-| `internal/server/` | HTTP server, API handlers (`server.go`, `serve_server.go`, `share.go`, `hook_event.go`, `copilot_event.go`) |
+| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`, `copilot_plan.go`, `codex_plan.go`, `agy_plan.go`) |
+| `internal/server/` | HTTP server, API handlers (`server.go`, `serve_server.go`, `share.go`, `hook_event.go`, `copilot_event.go`, `codex_event.go`, `codex_session.go`, `antigravity_event.go`) |
 | `internal/storage/` | Plan versioning & persistence |
 | `internal/config/` | Configuration management |
 | `internal/server/ui/dist/` | Embedded UI build output (gitignored) |
@@ -140,6 +169,19 @@ Defined in `apps/plugin/commands/`:
 |------|---------|
 | `plugin.json` | Copilot CLI plugin manifest (name, version, `hooks` pointer) |
 | `hooks.json` | Copilot CLI hook definition (`preToolUse` → `openplan copilot-plan`) |
+
+### Codex Hook Config (`apps/plugin-codex/`)
+
+| Path | Purpose |
+|------|---------|
+| `hooks.json` | Codex CLI hook definition (`Stop` → `openplan codex-plan`). No plugin manifest format exists for Codex — this is a reference file users copy manually, matching Codex's own convention. |
+
+### Antigravity Plugin (`apps/plugin-agy/`)
+
+| Path | Purpose |
+|------|---------|
+| `plugin.json` | Antigravity CLI plugin manifest (only documented field is optional `name`) |
+| `hooks.json` | Antigravity CLI hook definition (`PreToolUse` matched to `write_to_file` → `openplan agy-plan`) |
 
 ### Other
 

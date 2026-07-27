@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "openplan codex-plan",
+            "timeout": 345600
+          }
+        ]
+      }
+    ]
+  }
+}

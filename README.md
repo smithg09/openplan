@@ -93,6 +93,72 @@ To configure manually instead, create `~/.copilot/hooks/openplan.json` (or `.git
 
 Copilot CLI's `preToolUse` hook fires on every tool call; `openplan copilot-plan` filters for `exit_plan_mode` and reads the plan from Copilot's session state, so no matcher config is needed.
 
+## Codex CLI
+
+Install the binary (same command as above), then enable Codex hooks. Codex has no dedicated
+plan-exit event, so this uses the `Stop` hook (end of turn) and re-reads the turn's rollout
+transcript to find a plan, if one was produced.
+
+Add to `~/.codex/config.toml` (or `<repo>/.codex/config.toml`):
+
+```toml
+[features]
+hooks = true
+```
+
+Then create `~/.codex/hooks.json` (or `<repo>/.codex/hooks.json`):
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "openplan codex-plan", "timeout": 345600 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Notes:
+- Codex hooks are experimental and currently disabled on Windows.
+- Restart Codex after installing or changing hooks.
+- Because this is a `Stop` hook, review opens after Codex finishes rendering the plan for the
+  turn, not at a dedicated plan-exit point — `openplan codex-plan` silently allows the turn
+  through on any turn that didn't produce a plan, so it won't open a browser on ordinary turns.
+- If Codex runs as a desktop app (e.g. embedded in ChatGPT.app) rather than from your shell, the
+  spawned hook process may not inherit your shell `PATH` — use an absolute path to `openplan` in
+  `hooks.json` if `openplan codex-plan` isn't found.
+
+## Antigravity CLI (`agy`)
+
+Install the binary (same command as above). Antigravity has no dedicated plan-approval tool
+either — plan mode calls the generic `write_to_file` tool with `ArtifactMetadata.RequestFeedback`
+set, so `openplan agy-plan` filters on that flag rather than a tool name alone.
+
+Create `.agents/hooks.json` in your workspace (or `~/.gemini/config/hooks.json` globally):
+
+```json
+{
+  "openplan": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file",
+        "hooks": [
+          { "type": "command", "command": "openplan agy-plan", "timeout": 345600 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`apps/plugin-agy/` ships the same config as a plugin directory (`plugin.json` + `hooks.json`) for
+`agy plugin install`, but that install path hasn't been verified yet — use the manual
+`.agents/hooks.json` config above until it has.
+
 
 ## Usage
 
@@ -102,6 +168,8 @@ Copilot CLI's `preToolUse` hook fires on every tool call; `openplan copilot-plan
 | `openplan context` | PreToolUse hook: injects additional planning context |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
 | `openplan copilot-plan` | Copilot CLI preToolUse hook: intercepts `exit_plan_mode`, opens browser UI, returns decision |
+| `openplan codex-plan` | Codex CLI Stop hook: reviews a plan if the turn produced one |
+| `openplan agy-plan` | Antigravity CLI preToolUse hook: intercepts plan-mode `write_to_file` calls |
 | `openplan share <file>` | Generate a shareable browser link for any plan |
 | `openplan serve` | Start the persistent dashboard server |
 | `openplan sessions` | List active openplan sessions |
