@@ -6,5 +6,6 @@
   "repository": "https://github.com/smithg09/openplan",
   "license": "MIT",
   "keywords": ["planning", "review", "hooks", "exit_plan_mode", "annotations"],
-  "hooks": "hooks.json"
+  "hooks": "hooks.json",
+  "commands": "commands/"
 }

@@ -91,8 +91,19 @@ func installCodex(openplanPath string) error {
 		fmt.Printf("  %s already has the openplan Stop hook\n", hooksPath)
 	}
 
+	skillsPath := filepath.Join(codexHome, "skills")
+	written, err := hookinstall.WriteSkills(skillsPath)
+	if err != nil {
+		return fmt.Errorf("installing skills into %s: %w", skillsPath, err)
+	}
+	if len(written) > 0 {
+		fmt.Printf("  wrote skills to %s (%v)\n", skillsPath, written)
+	} else {
+		fmt.Printf("  %s already has the latest openplan skills\n", skillsPath)
+	}
+
 	fmt.Println()
-	fmt.Println("Codex hooks configured. Restart Codex to activate.")
+	fmt.Println("Codex hooks and skills configured. Restart Codex to activate.")
 	return nil
 }
 
@@ -130,7 +141,22 @@ func installAgy(openplanPath string) error {
 		fmt.Printf("  %s already has the openplan hook\n", hooksPath)
 	}
 
+	// agy only discovers skills from its global ~/.gemini/skills directory
+	// (confirmed empirically — a project-local .agents/skills or .gemini/skills
+	// is not picked up without --add-dir). Skills install there regardless of
+	// --local, which only affects the hooks.json path above.
+	skillsPath := filepath.Join(os.Getenv("HOME"), ".gemini", "skills")
+	written, err := hookinstall.WriteSkills(skillsPath)
+	if err != nil {
+		return fmt.Errorf("installing skills into %s: %w", skillsPath, err)
+	}
+	if len(written) > 0 {
+		fmt.Printf("  wrote skills to %s (%v)\n", skillsPath, written)
+	} else {
+		fmt.Printf("  %s already has the latest openplan skills\n", skillsPath)
+	}
+
 	fmt.Println()
-	fmt.Println("Antigravity CLI hooks configured. Restart agy to activate.")
+	fmt.Println("Antigravity CLI hooks and skills configured. Restart agy to activate.")
 	return nil
 }
