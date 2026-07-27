@@ -99,11 +99,25 @@ through openplan again. Not fixed with a secondary heuristic (e.g. matching the 
 filename) because the plan filename itself varies between sessions (`hello_world_plan.md` vs.
 `implementation_plan.md` observed across two runs).
 
+**Automated install for Codex and Antigravity**: unlike Claude Code and Copilot CLI (which
+register hooks via their own `/plugin marketplace add` + `/plugin install` flow), Codex and `agy`
+don't have an install path openplan can drive through the target CLI's own installer with
+confidence — Codex hooks require toggling `[features] hooks = true` in `config.toml`, a step
+outside any plugin package's scope, and `agy plugin install <dir>` was never verified to actually
+wire up `hooks.json` (see `apps/plugin-agy/`'s README note). `openplan install codex` and
+`openplan install agy` (`internal/hookinstall/`) close that gap by writing the config directly:
+narrow, purpose-built patchers (not general TOML/JSON parsers) that merge into existing
+`config.toml`/`hooks.json` — preserving unrelated hooks, plugins, and settings — rather than
+requiring users to hand-edit those files. Idempotent; safe to re-run. Verified against copies of
+this machine's real `~/.codex/config.toml` and `~/.codex/hooks.json` (which already had an
+unrelated `plannotator` `Stop` hook installed) and a synthetic multi-hook-group `agy` config.
+
 ## CLI Commands
 
 | Command | Description |
 |---------|-------------|
 | `openplan` | Hook mode — reads stdin event, opens browser, returns decision |
+| `openplan install <codex\|agy>` | Merge required hooks into that agent's config (`--local` for repo-scoped) |
 | `openplan context` | PreToolUse hook — outputs additionalContext JSON |
 | `openplan serve` | Start persistent dashboard server |
 | `openplan annotate [file\|dir]` | Open file/directory in annotation UI |
@@ -131,8 +145,9 @@ Defined in `apps/plugin/commands/`:
 
 | Path | Purpose |
 |------|---------|
-| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`, `copilot_plan.go`, `codex_plan.go`, `agy_plan.go`) |
+| `cmd/` | Cobra command definitions (`root.go`, `serve.go`, `annotate.go`, `context.go`, `config_cmd.go`, `sessions.go`, `share.go`, `copilot_plan.go`, `codex_plan.go`, `agy_plan.go`, `install.go`) |
 | `internal/server/` | HTTP server, API handlers (`server.go`, `serve_server.go`, `share.go`, `hook_event.go`, `copilot_event.go`, `codex_event.go`, `codex_session.go`, `antigravity_event.go`) |
+| `internal/hookinstall/` | Patchers for `openplan install` — merge hooks into each agent's config file (`codex.go`, `agy.go`) |
 | `internal/storage/` | Plan versioning & persistence |
 | `internal/config/` | Configuration management |
 | `internal/server/ui/dist/` | Embedded UI build output (gitignored) |
