@@ -27,6 +27,8 @@ FILES=(
   "apps/landing-page/package.json"
   "packages/shared/package.json"
   ".claude-plugin/marketplace.json"
+  ".github/plugin/marketplace.json"
+  "apps/plugin-copilot/plugin.json"
 )
 CHANGELOG="CHANGELOG.md"
 

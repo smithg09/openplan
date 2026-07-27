@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **GitHub Copilot CLI integration** — `openplan copilot-plan` hooks Copilot's `preToolUse` event, filters for `exit_plan_mode` calls, and opens the same visual review UI used for Claude Code
+- **Codex CLI integration** — `openplan codex-plan` hooks Codex's `Stop` event, re-parses the turn's rollout transcript to find the latest plan, and reviews it in the browser UI (only when the turn actually produced a plan)
+- **Antigravity CLI (`agy`) integration** — `openplan agy-plan` hooks `PreToolUse` on `write_to_file` calls with `RequestFeedback: true` to catch Antigravity's plan-mode submissions
+- **`openplan install <codex|agy>`** — automated hook installation for Codex and Antigravity, merging the required config directly into `~/.codex/config.toml` / `hooks.json` and `agy`'s `hooks.json` (`--local` for repo-scoped install), since neither CLI has a reliable plugin-install flow of its own
+
 ## [0.3.0] - 2026-06-13
 
 ### Added

@@ -35,8 +35,30 @@ type Server struct {
 	dirRoot  string
 	dirFiles []string
 
+	decisionBuilder DecisionBuilder
+
 	decision chan string
 	httpSrv  *http.Server
+}
+
+// DecisionBuilder formats the approve/deny decision written to hook stdout.
+// Each calling agent (Claude Code, GitHub Copilot CLI, Codex, ...) expects a
+// different JSON shape, so the format is pluggable per Server instance.
+type DecisionBuilder interface {
+	BuildApprove(mode string) string
+	BuildDeny(message string) string
+}
+
+// claudeDecisionBuilder is the default, matching Claude Code's
+// PermissionRequest hookSpecificOutput contract.
+type claudeDecisionBuilder struct{}
+
+func (claudeDecisionBuilder) BuildApprove(mode string) string { return buildApproveDecision(mode) }
+func (claudeDecisionBuilder) BuildDeny(message string) string { return buildDenyDecision(message) }
+
+// WithDecisionBuilder overrides the decision format for non-Claude agents.
+func (s *Server) WithDecisionBuilder(b DecisionBuilder) {
+	s.decisionBuilder = b
 }
 
 // WithDirectory enables directory-browsing mode. root must be an absolute path;
@@ -83,14 +105,15 @@ func New(
 	binVersion string,
 ) *Server {
 	return &Server{
-		cfg:         cfg,
-		event:       event,
-		projectSlug: projectSlug,
-		planSlug:    planSlug,
-		version:     version,
-		binVersion:  binVersion,
-		store:       store,
-		decision:    make(chan string, 1),
+		cfg:             cfg,
+		event:           event,
+		projectSlug:     projectSlug,
+		planSlug:        planSlug,
+		version:         version,
+		binVersion:      binVersion,
+		store:           store,
+		decisionBuilder: claudeDecisionBuilder{},
+		decision:        make(chan string, 1),
 	}
 }
 
@@ -347,7 +370,7 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 		contentToSnapshot = body.EditedContent
 	}
 
-	decision := buildApproveDecision(body.Mode)
+	decision := s.decisionBuilder.BuildApprove(body.Mode)
 	s.sendDecision(decision)
 
 	existing, err := s.store.ReadVersion(s.projectSlug, s.planSlug, s.version)
@@ -386,7 +409,7 @@ func (s *Server) handleDeny(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	decision := buildDenyDecision(body.Message)
+	decision := s.decisionBuilder.BuildDeny(body.Message)
 	s.sendDecision(decision)
 
 	if err := s.store.WriteMeta(s.projectSlug, s.planSlug, "denied", s.version); err != nil {
@@ -739,7 +762,7 @@ func saveToNotion(cfg *config.Config, title, content string) (string, string, er
 // handleHealthz returns a simple health check response.
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"ok":true,"version":"0.2.0"}`)
+	fmt.Fprintf(w, `{"ok":true,"version":"0.3.0"}`)
 }
 
 // spaHandler returns a handler that serves static files and falls back to

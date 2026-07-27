@@ -44,6 +44,9 @@ func init() {
 	rootCmd.AddCommand(annotateCmd)
 	rootCmd.AddCommand(sessionsCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(copilotPlanCmd)
+	rootCmd.AddCommand(codexPlanCmd)
+	rootCmd.AddCommand(agyPlanCmd)
 }
 
 func runHookMode(browser string) error {

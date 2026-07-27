@@ -20,30 +20,43 @@ const HARNESSES = [
     id: 'codex',
     label: 'Codex',
     iconSrc: '/assets/icon-codex.png',
-    current: false,
-    steps: ['Codex support coming soon'],
+    current: true,
+    stepLabel: 'Then run:',
+    steps: [
+      'openplan install codex',
+      'Restart Codex to activate hooks',
+    ],
   },
   {
     id: 'copilot',
     label: 'Copilot',
     iconSrc: '/assets/icon-copilot.svg',
-    current: false,
-    steps: ['Copilot support coming soon'],
+    current: true,
+    stepLabel: 'Then in Copilot CLI:',
+    steps: [
+      '/plugin marketplace add smithg09/openplan',
+      '/plugin install openplan-copilot@openplan',
+      'Restart Copilot CLI — plan review activates on Shift+Tab',
+    ],
   },
   {
     id: 'antigravity',
     label: 'Antigravity CLI',
     iconSrc: '/assets/icon-antigravity-color.png',
-    current: false,
-    steps: ['Antigravity CLI support coming soon'],
+    current: true,
+    stepLabel: 'Then run:',
+    steps: [
+      'openplan install agy',
+      'Restart agy to activate hooks',
+    ],
   },
-  {
-    id: 'vscode',
-    label: 'VS Code',
-    iconSrc: '/assets/icon-vscode.svg',
-    current: false,
-    steps: ['VS Code support coming soon'],
-  },
+  // {
+  //   id: 'vscode',
+  //   label: 'VS Code',
+  //   iconSrc: '/assets/icon-vscode.svg',
+  //   current: false,
+  //   steps: ['VS Code support coming soon'],
+  // },
 ];
 
 function CopyBtn({ text }: { text: string }) {

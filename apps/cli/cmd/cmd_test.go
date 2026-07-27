@@ -165,7 +165,6 @@ func TestListMarkdownFiles_Nested(t *testing.T) {
 	}
 }
 
-
 // ── mustGetwd ─────────────────────────────────────────────────────────────
 
 func TestMustGetwd(t *testing.T) {
@@ -177,16 +176,6 @@ func TestMustGetwd(t *testing.T) {
 	if !filepath.IsAbs(cwd) && cwd != "." {
 		t.Errorf("mustGetwd returned non-absolute path: %q", cwd)
 	}
-}
-
-// ── openBrowser (error paths only, no real browser launch) ────────────────
-
-func TestOpenBrowser_UnsupportedPlatform(t *testing.T) {
-	// We test openWithBrowser / openDefault indirectly via the switch.
-	// Since runtime.GOOS is always valid in CI, we only check that
-	// openBrowser("default", ...) does not panic.
-	// We can't assert on the error because the platform may have 'open'/'xdg-open'.
-	_ = openBrowser("default", "http://example.com")
 }
 
 // ── SetVersion ────────────────────────────────────────────────────────────

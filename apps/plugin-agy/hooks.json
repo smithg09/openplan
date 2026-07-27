@@ -1,0 +1,16 @@
+{
+  "openplan": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "openplan agy-plan",
+            "timeout": 345600
+          }
+        ]
+      }
+    ]
+  }
+}

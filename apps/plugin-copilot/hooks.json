@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "openplan copilot-plan",
+        "powershell": "openplan copilot-plan",
+        "timeoutSec": 345600,
+        "comment": "Intercepts exit_plan_mode to open the Openplan visual plan review UI"
+      }
+    ]
+  }
+}

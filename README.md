@@ -67,14 +67,129 @@ For Option 2 or 3, add the following to your `~/.claude/settings.json` (or your 
 
 Restart Claude Code. The next time you use plan mode, Openplan will intercept the `ExitPlanMode` event, open the plan in a browser, and return your approve/deny decision to Claude Code.
 
+## GitHub Copilot CLI
+
+Install the binary (same command as above), then register the hooks via Copilot CLI's plugin marketplace:
+
+```
+/plugin marketplace add smithg09/openplan
+/plugin install openplan-copilot@openplan
+```
+
+Restart Copilot CLI. Plan review activates automatically whenever you use plan mode (`Shift+Tab`).
+
+To configure manually instead, create `~/.copilot/hooks/openplan.json` (or `.github/hooks/openplan.json` in your repo):
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      { "type": "command", "bash": "openplan copilot-plan", "timeoutSec": 345600 }
+    ]
+  }
+}
+```
+
+Copilot CLI's `preToolUse` hook fires on every tool call; `openplan copilot-plan` filters for `exit_plan_mode` and reads the plan from Copilot's session state, so no matcher config is needed.
+
+## Codex CLI
+
+Install the binary (same command as above), then run:
+
+```bash
+openplan install codex
+```
+
+This enables the Codex `hooks` feature flag in `~/.codex/config.toml` and registers the `Stop`
+hook in `~/.codex/hooks.json` for you — it merges into your existing config rather than
+overwriting it, so other hooks and settings are untouched, and it's safe to re-run. Use
+`openplan install codex --local` to configure the current repo (`.codex/`) instead of your global
+config. Codex has no dedicated plan-exit event, so this uses the `Stop` hook (end of turn) and
+re-reads the turn's rollout transcript to find a plan, if one was produced.
+
+To configure manually instead, add to `~/.codex/config.toml` (or `<repo>/.codex/config.toml`):
+
+```toml
+[features]
+hooks = true
+```
+
+Then create `~/.codex/hooks.json` (or `<repo>/.codex/hooks.json`):
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "openplan codex-plan", "timeout": 345600 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Notes:
+- Codex hooks are experimental and currently disabled on Windows.
+- Restart Codex after installing or changing hooks.
+- Because this is a `Stop` hook, review opens after Codex finishes rendering the plan for the
+  turn, not at a dedicated plan-exit point — `openplan codex-plan` silently allows the turn
+  through on any turn that didn't produce a plan, so it won't open a browser on ordinary turns.
+- If Codex runs as a desktop app (e.g. embedded in ChatGPT.app) rather than from your shell, the
+  spawned hook process may not inherit your shell `PATH` — use an absolute path to `openplan` in
+  `hooks.json` if `openplan codex-plan` isn't found.
+
+## Antigravity CLI (`agy`)
+
+Install the binary (same command as above), then run:
+
+```bash
+openplan install agy
+```
+
+This registers the `PreToolUse` hook in `~/.gemini/config/hooks.json` for you, merged in under
+its own `openplan` key so any other hook groups you already have are left alone. Use
+`openplan install agy --local` to configure the current workspace (`.agents/hooks.json`) instead.
+Antigravity has no dedicated plan-approval tool either — plan mode calls the generic
+`write_to_file` tool with `ArtifactMetadata.RequestFeedback` set, so `openplan agy-plan` filters
+on that flag rather than a tool name alone.
+
+To configure manually instead, create `.agents/hooks.json` in your workspace (or
+`~/.gemini/config/hooks.json` globally):
+
+```json
+{
+  "openplan": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file",
+        "hooks": [
+          { "type": "command", "command": "openplan agy-plan", "timeout": 345600 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`apps/plugin-agy/` ships the same config as a plugin directory (`plugin.json` + `hooks.json`) for
+`agy plugin install`, but that install path hasn't been verified yet — use the manual
+`.agents/hooks.json` config above until it has.
+
 
 ## Usage
 
 | Command | Description |
 |---------|-------------|
 | `openplan` | Hook mode: reads ExitPlanMode event from stdin, opens browser UI, returns decision |
+| `openplan install <codex\|agy>` | Merge the required hooks into that agent's config automatically (`--local` for repo-scoped) |
 | `openplan context` | PreToolUse hook: injects additional planning context |
 | `openplan annotate [file\|dir]` | Open a markdown file or directory in the annotation UI |
+| `openplan copilot-plan` | Copilot CLI preToolUse hook: intercepts `exit_plan_mode`, opens browser UI, returns decision |
+| `openplan codex-plan` | Codex CLI Stop hook: reviews a plan if the turn produced one |
+| `openplan agy-plan` | Antigravity CLI preToolUse hook: intercepts plan-mode `write_to_file` calls |
 | `openplan share <file>` | Generate a shareable browser link for any plan |
 | `openplan serve` | Start the persistent dashboard server |
 | `openplan sessions` | List active openplan sessions |

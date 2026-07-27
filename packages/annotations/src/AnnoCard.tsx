@@ -67,16 +67,24 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
       style={{
         background: isFocus ? 'var(--bg-elevated)' : 'var(--bg-base)',
         border: `1px solid ${isFocus ? 'var(--border-strong)' : 'var(--border)'}`,
-        borderLeft: `3px solid ${typeColor}`,
         borderRadius: 8,
         padding: '10px 12px',
         cursor: editing ? 'default' : 'pointer',
-        transition: 'border-color 0.15s, background 0.15s',
+        transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
         marginBottom: 1,
+        boxShadow: isFocus ? `0 0 0 3px color-mix(in srgb, ${typeColor} 16%, transparent)` : 'none',
       }}
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span
+          aria-hidden
+          style={{
+            width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+            background: typeColor,
+            boxShadow: `0 0 0 3px color-mix(in srgb, ${typeColor} 18%, transparent)`,
+          }}
+        />
         <AnnoIcon type={anno.type} size={12} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: typeColor, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
           {meta.label}
@@ -95,11 +103,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
       {/* Quote */}
       {anchor && (
         <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 6,
           fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)',
-          background: 'var(--bg-inset)', borderRadius: 4, padding: '4px 8px',
-          marginBottom: 7, borderLeft: `2px solid ${typeColor}`, opacity: 0.85,
+          background: 'var(--bg-inset)', border: '1px solid var(--border)',
+          borderRadius: 5, padding: '5px 8px', marginBottom: 7,
         }}>
-          "{anchor.length > 72 ? anchor.slice(0, 70) + '…' : anchor}"
+          <span style={{ color: typeColor, opacity: 0.7, fontSize: 14, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>&ldquo;</span>
+          <span>{anchor.length > 72 ? anchor.slice(0, 70) + '…' : anchor}</span>
         </div>
       )}
 
