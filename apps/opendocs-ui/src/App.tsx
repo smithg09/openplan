@@ -22,6 +22,7 @@ export default function App() {
   const [draft, setDraft] = React.useState('');
   const [focusId, setFocusId] = React.useState<string | null>(null);
   const [orphans, setOrphans] = React.useState<Set<string>>(new Set());
+  const [submitted, setSubmitted] = React.useState(false);
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const me = React.useMemo(() => localAuthor(), []);
@@ -183,6 +184,17 @@ export default function App() {
             ))}
           </select>
         )}
+        <button
+          className="od-btn od-btn-primary"
+          disabled={submitted}
+          title="Tell the agent you're done; it receives your open comments"
+          onClick={async () => {
+            try { await api.submitReview(); setSubmitted(true); }
+            catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+          }}
+        >
+          {submitted ? 'Review submitted ✓' : 'Submit review'}
+        </button>
       </div>
 
       <div className="od-body">

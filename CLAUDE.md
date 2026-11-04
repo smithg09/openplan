@@ -9,6 +9,7 @@ openplan (root)
 ├── apps/
 │   ├── cli/              → Go CLI (cobra-based, entry: main.go)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
+│   ├── opendocs-ui/      → React + Vite host UI for the `opendocs` binary (plain CSS + tokens, no Tailwind)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
 │   ├── plugin/           → Claude Code plugin (hooks + slash commands)
 │   ├── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json + commands/)
@@ -46,6 +47,10 @@ bun run build:ui             # Build main UI → apps/cli/internal/server/ui/dis
 bun run build:landing        # Build landing page → apps/landing-page/dist/
 bun run build:cli            # Build Go binary → bin/openplan
 bun run build                # Build UI + CLI (UI first, then CLI)
+bun run build:opendocs-ui    # Build opendocs host UI → apps/cli/internal/opendocs/server/ui/dist/
+bun run build:opendocs       # Build Go binary → bin/opendocs
+bun run build:docs           # opendocs UI + binary (UI first)
+bun run dev:opendocs-ui      # Vite dev server for opendocs UI (proxies /api → :7433; run `opendocs serve --port 7433`)
 bun run dev:ui               # Vite dev server for main UI (port 5173, proxies /api → :7432)
 bun run dev:landing          # Vite dev server for landing page (port 5174)
 bun run typecheck            # TypeScript type checking (via Turbo)
@@ -193,6 +198,49 @@ specific to openplan's `allowed-tools` matcher).
 support was empirically found unreliable — see above). Instead written directly by
 `openplan install codex` / `openplan install agy` as `SKILL.md` files — see "Automated install"
 above for the exact paths and the source of truth in `internal/hookinstall/skills/`.
+
+## opendocs (sibling binary)
+
+`opendocs` reviews rich **HTML documents** (agents publish self-contained HTML, people comment on
+the exact words, every version is kept), local-first. It is a **second `main` in the same Go module**
+(`apps/cli/cmd/opendocs/`) — not a separate module, because Go's `internal/` rule forbids a
+separate module from importing `apps/cli/internal/*`. It ships as its own release artifact
+(`opendocs_<os>_<arch>.tar.gz`); `scripts/install.sh` takes `opendocs` as its first arg.
+
+| Command | Description |
+|---------|-------------|
+| `opendocs open <file.html>` | Snapshot the file if changed, start the local server, open the browser |
+| `opendocs review <file.html>` | Like `open`, but blocks until the reviewer clicks **Submit review**, then prints open threads as JSON on stdout (status goes to stderr) |
+| `opendocs serve` | Project dashboard server |
+| `opendocs create <file.html>` / `versions <doc>` / `comments <doc>` / `restore <doc> <version-id>` | Store-backed CLI |
+
+Package layout (`apps/cli/internal/opendocs/`):
+
+- `store/` — content-addressed immutable versions under `~/.opendocs/docs/<project>/<doc>/`
+  (`versions/<sha256>.html`, `versions.json` manifest with parent chain, doc-scoped `comments.json`).
+  Atomic temp+rename writes; `expectedHead` gives If-Match optimistic concurrency (`ErrConflict`).
+- `render/` — embeds `bridge.js` and injects it at the top of `<head>`. Hand-written vanilla JS on
+  purpose (no bundler in the Go build). Anchoring is a port of slashdocs' TextQuoteSelector idea
+  (MIT — `LICENSE.slashdocs` kept alongside).
+- `server/` — same-origin `net/http` (Go 1.22 method patterns); `GET .../versions/{id}/frame` returns
+  bridge-injected HTML; embeds `ui/dist` with `//go:embed all:ui/dist` and a **force-tracked
+  `.gitkeep`** so `go build`/`go test` work before the UI is built (assets stay gitignored).
+
+**Sandbox model (important):** the doc renders in `<iframe sandbox="allow-scripts">` with **no
+`allow-same-origin`** (opaque origin, can't reach the API/cookies). The bridge runs *inside* the
+iframe and talks to the host only via `postMessage`; the host filters by
+`event.source === iframe.contentWindow` (origin is `"null"`). Do **not** add a
+`Content-Security-Policy: sandbox` response header to `/frame` — Chromium blocks a sandbox-CSP
+document inside an already-sandboxed iframe (`net::ERR_BLOCKED_BY_CLIENT`). Hardening the
+direct-open case (separate origin or one-time token) is a known follow-up.
+
+**Gotchas:** the API/store anchor uses `start`/`end`; the shared `CommentAnchor` uses
+`startOffset`/`endOffset` — conversion lives only in `apps/opendocs-ui/src/adapt.ts`. opendocs-ui
+reuses `AnnoCard` via that adapter but **not** `CommentRail` (it is coupled to same-document
+`[data-bind-id]` marks and can't see inside the iframe). opendocs-ui builds into
+`apps/cli/internal/opendocs/server/ui/dist` with `emptyOutDir: false` — never point it near
+openplan's `internal/server/ui/dist` (that would wipe openplan's UI). UI must be built before the Go
+binary, same as openplan.
 
 ## Important Paths
 

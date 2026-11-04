@@ -30,6 +30,9 @@ jobs:
       - name: Build UI
         run: bun run build:ui
 
+      - name: Build opendocs UI
+        run: bun run build:opendocs-ui
+
       - name: Extract tag
         id: tag
         run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
@@ -60,9 +63,19 @@ jobs:
 
             tar -czf "openplan_${GOOS}_${GOARCH}.tar.gz" openplan
             rm openplan
+
+            echo "Building opendocs for ${GOOS}/${GOARCH}..."
+            cd apps/cli
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o ../../opendocs ./cmd/opendocs
+            cd ../..
+
+            tar -czf "opendocs_${GOOS}_${GOARCH}.tar.gz" opendocs
+            rm opendocs
           done
 
-          ls -lh openplan_*.tar.gz
+          ls -lh openplan_*.tar.gz opendocs_*.tar.gz
 
       - name: Extract changelog entry
         id: changelog
@@ -76,6 +89,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: openplan_*.tar.gz
+          files: |
+            openplan_*.tar.gz
+            opendocs_*.tar.gz
           body: ${{ steps.changelog.outputs.body }}
           prerelease: ${{ contains(steps.tag.outputs.version, '-') }}

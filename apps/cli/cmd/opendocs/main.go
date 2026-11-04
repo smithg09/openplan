@@ -6,6 +6,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -172,7 +174,7 @@ var openCmd = &cobra.Command{
 
 		srv := server.New(store.New(), project, version)
 		srv.SetFocus(docSlug)
-		return runServer(cmd, srv, "/?doc="+docSlug)
+		return ignoreInterrupt(runServer(cmd, srv, "/?doc="+docSlug, false))
 	},
 }
 
@@ -182,7 +184,7 @@ var serveCmd = &cobra.Command{
 	Short: "Start the local review server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		srv := server.New(store.New(), projectSlug(), version)
-		return runServer(cmd, srv, "/")
+		return ignoreInterrupt(runServer(cmd, srv, "/", false))
 	},
 }
 
@@ -202,8 +204,10 @@ func snapshotIfChanged(doc *store.Doc, content []byte) error {
 	return cerr
 }
 
-// runServer starts srv, opens the browser at openPath, and blocks until SIGINT.
-func runServer(cmd *cobra.Command, srv *server.Server, openPath string) error {
+// runServer starts srv, opens the browser at openPath, and blocks until SIGINT
+// (returning errInterrupted) or, when untilDone is set, until the reviewer
+// submits their review in the UI (returning nil).
+func runServer(cmd *cobra.Command, srv *server.Server, openPath string, untilDone bool) error {
 	port, _ := cmd.Flags().GetInt("port")
 	actual, err := srv.Start(port)
 	if err != nil {
@@ -222,11 +226,24 @@ func runServer(cmd *cobra.Command, srv *server.Server, openPath string) error {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	<-sig
-	srv.Stop()
-	fmt.Fprintln(os.Stderr, "\nopendocs: stopped")
-	return nil
+	var done <-chan struct{} // nil blocks forever, so plain `open`/`serve` ignore it
+	if untilDone {
+		done = srv.Done()
+	}
+	select {
+	case <-sig:
+		srv.Stop()
+		fmt.Fprintln(os.Stderr, "\nopendocs: stopped")
+		return errInterrupted
+	case <-done:
+		srv.Stop()
+		return nil
+	}
 }
+
+// errInterrupted marks a Ctrl+C. `review` treats it as "no review submitted";
+// open/serve treat it as a normal exit.
+var errInterrupted = fmt.Errorf("interrupted")
 
 func openBrowser(url string) error {
 	switch runtime.GOOS {
@@ -241,7 +258,138 @@ func openBrowser(url string) error {
 	}
 }
 
+// ignoreInterrupt turns a Ctrl+C into a clean exit for open/serve.
+func ignoreInterrupt(err error) error {
+	if errors.Is(err, errInterrupted) {
+		return nil
+	}
+	return err
+}
+
+// reviewResult is what `opendocs review` prints on stdout for the agent.
+type reviewResult struct {
+	Doc       string         `json:"doc"`
+	VersionID string         `json:"versionId"`
+	Open      []reviewThread `json:"open"`
+	Resolved  int            `json:"resolvedCount"`
+}
+
+type reviewThread struct {
+	ID      string        `json:"id"`
+	Quote   string        `json:"quote"`
+	Author  string        `json:"author,omitempty"`
+	Comment string        `json:"comment"`
+	Replies []reviewReply `json:"replies,omitempty"`
+}
+
+type reviewReply struct {
+	Author  string `json:"author,omitempty"`
+	Comment string `json:"comment"`
+}
+
+// buildReview summarizes a document's comments: open threads in full, resolved
+// threads as a count (the agent only needs to act on what is still open).
+func buildReview(doc *store.Doc, docSlug string) (reviewResult, error) {
+	res := reviewResult{Doc: docSlug, Open: []reviewThread{}}
+	if head, err := doc.Head(); err == nil {
+		res.VersionID = head.ID
+	}
+	comments, err := doc.ListComments()
+	if err != nil {
+		return res, err
+	}
+	replies := map[string][]reviewReply{}
+	for _, c := range comments {
+		if c.RootCommentID != "" {
+			replies[c.RootCommentID] = append(replies[c.RootCommentID], reviewReply{Author: c.Author, Comment: c.Body})
+		}
+	}
+	for _, c := range comments {
+		if c.RootCommentID != "" {
+			continue
+		}
+		if c.Status == store.StatusResolved {
+			res.Resolved++
+			continue
+		}
+		t := reviewThread{ID: c.ID, Author: c.Author, Comment: c.Body, Replies: replies[c.ID]}
+		if c.Anchor != nil {
+			t.Quote = c.Anchor.Quote
+		}
+		res.Open = append(res.Open, t)
+	}
+	return res, nil
+}
+
+// reviewCmd opens a document for review and blocks until the reviewer clicks
+// "Submit review", then prints the open threads as JSON on stdout so an agent
+// can read the feedback without polling.
+var reviewCmd = &cobra.Command{
+	Use:   "review <file.html>",
+	Short: "Open a document, wait for the reviewer to submit, print their comments as JSON",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path := args[0]
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", path, err)
+		}
+		name, _ := cmd.Flags().GetString("name")
+		if name == "" {
+			name = filepath.Base(path)
+		}
+		project := projectSlug()
+		docSlug := store.Slug(name)
+		doc := store.New().Doc(project, docSlug)
+		if err := snapshotIfChanged(doc, content); err != nil {
+			return err
+		}
+
+		srv := server.New(store.New(), project, version)
+		srv.SetFocus(docSlug)
+		if err := runServer(cmd, srv, "/?doc="+docSlug, true); err != nil {
+			if errors.Is(err, errInterrupted) {
+				return fmt.Errorf("review not submitted (interrupted)")
+			}
+			return err
+		}
+
+		res, err := buildReview(doc, docSlug)
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(res)
+	},
+}
+
+// restoreCmd makes an earlier version the new head (as a new version).
+var restoreCmd = &cobra.Command{
+	Use:   "restore <doc> <version-id>",
+	Short: "Restore an earlier version as the new head",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		doc := store.New().Doc(projectSlug(), store.Slug(args[0]))
+		head, err := doc.Head()
+		if err != nil {
+			return fmt.Errorf("document has no versions: %w", err)
+		}
+		v, err := doc.Restore(args[1], head.ID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("restored %s as new version %s\n", args[1], v.ID)
+		return nil
+	},
+}
+
 func init() {
+	rootCmd.AddCommand(reviewCmd, restoreCmd)
+	reviewCmd.Flags().String("name", "", "Document name (defaults to the file name)")
+	reviewCmd.Flags().Int("port", 0, "Preferred port (0 = pick an open one)")
+	reviewCmd.Flags().Bool("no-browser", false, "Don't open a browser")
+
 	createCmd.Flags().String("name", "", "Document name (defaults to the file name)")
 	createCmd.Flags().String("label", "", "Short version label")
 	createCmd.Flags().String("summary", "", "Change summary")

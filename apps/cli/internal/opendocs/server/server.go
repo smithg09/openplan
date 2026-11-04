@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/render"
@@ -34,12 +35,19 @@ type Server struct {
 	version string
 
 	httpSrv *http.Server
+
+	done     chan struct{} // closed when the reviewer submits their review
+	doneOnce sync.Once
 }
 
 // New returns a Server scoped to a project within the store.
 func New(st *store.Store, project, version string) *Server {
-	return &Server{store: st, project: project, version: version}
+	return &Server{store: st, project: project, version: version, done: make(chan struct{})}
 }
+
+// Done is closed once the reviewer submits their review in the UI. The
+// `opendocs review` command blocks on it.
+func (s *Server) Done() <-chan struct{} { return s.done }
 
 // SetFocus names the document the UI should open on load.
 func (s *Server) SetFocus(doc string) { s.focus = doc }
@@ -49,6 +57,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/session", s.handleSession)
+	mux.HandleFunc("POST /api/session/done", s.handleDone)
 	mux.HandleFunc("GET /api/docs", s.handleListDocs)
 	mux.HandleFunc("GET /api/docs/{doc}/versions", s.handleListVersions)
 	mux.HandleFunc("POST /api/docs/{doc}/versions", s.handleCreateVersion)
@@ -111,6 +120,12 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		"focus":   s.focus,
 		"version": s.version,
 	})
+}
+
+// handleDone records that the reviewer finished; idempotent.
+func (s *Server) handleDone(w http.ResponseWriter, r *http.Request) {
+	s.doneOnce.Do(func() { close(s.done) })
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {

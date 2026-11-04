@@ -175,6 +175,26 @@ func TestPlaceholderServedAtRoot(t *testing.T) {
 	}
 }
 
+func TestDoneSignal(t *testing.T) {
+	s, _ := newTestServer(t)
+	select {
+	case <-s.Done():
+		t.Fatal("Done should not be closed before the reviewer submits")
+	default:
+	}
+	// Posting twice must not panic (closing a closed channel).
+	for i := range 2 {
+		if w := do(t, s.Handler(), "POST", "/api/session/done", nil); w.Code != http.StatusOK {
+			t.Fatalf("done #%d: %d", i, w.Code)
+		}
+	}
+	select {
+	case <-s.Done():
+	default:
+		t.Fatal("Done should be closed after the reviewer submits")
+	}
+}
+
 func TestSessionAPI(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.SetFocus("report")

@@ -52,3 +52,19 @@ jobs:
 
       - name: Verify binary
         run: ./bin/openplan --version
+
+      - name: Build opendocs UI
+        run: bun run build:opendocs-ui
+
+      - name: Build opendocs
+        run: |
+          cd apps/cli
+          go build -ldflags="-s -w" -o ../../bin/opendocs ./cmd/opendocs
+
+      - name: Verify opendocs binary
+        run: ./bin/opendocs --version
+
+      - name: Go tests
+        run: |
+          cd apps/cli
+          go test ./...

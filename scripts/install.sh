@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
+# Installs a release binary. Defaults to openplan; pass "opendocs" to install that instead:
+#   curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash
+#   curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs
 set -e
 REPO="smithg09/openplan"
+BIN="${1:-openplan}"
 INSTALL_DIR="${OPENPLAN_INSTALL_DIR:-$HOME/.local/bin}"
+
+case "$BIN" in
+  openplan|opendocs) ;;
+  *) echo "Unknown binary: $BIN (expected openplan or opendocs)" >&2; exit 1 ;;
+esac
 
 detect_platform() {
   OS="$(uname -s)"
@@ -21,16 +30,19 @@ detect_platform() {
 
 PLATFORM="$(detect_platform)"
 LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
-URL="https://github.com/$REPO/releases/download/$LATEST/openplan_${PLATFORM}.tar.gz"
+URL="https://github.com/$REPO/releases/download/$LATEST/${BIN}_${PLATFORM}.tar.gz"
 
-echo "Installing openplan $LATEST for $PLATFORM..."
+echo "Installing $BIN $LATEST for $PLATFORM..."
 mkdir -p "$INSTALL_DIR"
-curl -fsSL "$URL" | tar -xz -C "$INSTALL_DIR" openplan
-chmod +x "$INSTALL_DIR/openplan"
+curl -fsSL "$URL" | tar -xz -C "$INSTALL_DIR" "$BIN"
+chmod +x "$INSTALL_DIR/$BIN"
 
 echo ""
-echo "Installed to $INSTALL_DIR/openplan"
-echo ""
-echo "To set up the Claude Code plugin, open Claude Code and run:"
-echo "  /plugin marketplace add smithg09/openplan"
-echo "  /plugin install openplan@openplan"
+echo "Installed to $INSTALL_DIR/$BIN"
+
+if [ "$BIN" = "openplan" ]; then
+  echo ""
+  echo "To set up the Claude Code plugin, open Claude Code and run:"
+  echo "  /plugin marketplace add smithg09/openplan"
+  echo "  /plugin install openplan@openplan"
+fi
