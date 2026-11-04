@@ -1,0 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap");
+@import "./styles/tokens.css";
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; padding: 0; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+input, textarea, select { font: inherit; color: inherit; }
+
+/* ── App shell ─────────────────────────────────────────────────────────── */
+.od-app { display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; }
+.od-topbar {
+  height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border);
+}
+.od-brand { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 13px; }
+.od-brand b { color: var(--text-primary); font-weight: 700; }
+.od-brand .od-accent { color: var(--accent); }
+.od-doc-title { font-size: 13px; color: var(--text-secondary); font-family: var(--font-mono); }
+.od-spacer { flex: 1; }
+.od-select {
+  height: 28px; padding: 0 8px; background: var(--bg-base); border: 1px solid var(--border);
+  border-radius: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);
+}
+
+.od-body { flex: 1; min-height: 0; display: flex; flex-direction: row; }
+.od-doc-pane { flex: 1; min-width: 0; position: relative; background: var(--bg-base); }
+.od-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.od-rail {
+  width: 360px; flex-shrink: 0; border-left: 1px solid var(--border);
+  background: var(--bg-surface); display: flex; flex-direction: column; min-height: 0;
+}
+.od-rail-head {
+  height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px;
+  border-bottom: 1px solid var(--border); font-family: var(--font-mono);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted);
+}
+.od-rail-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.od-empty { padding: 28px 16px; text-align: center; color: var(--text-faint); font-size: 12.5px; font-family: var(--font-mono); }
+
+/* Composer */
+.od-composer {
+  border: 1px solid var(--accent); border-radius: 8px; background: var(--bg-elevated);
+  padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 6px 20px -8px rgba(0,0,0,0.35);
+}
+.od-composer-quote {
+  font-size: 13px; color: var(--text-secondary); padding-left: 10px;
+  border-left: 3px solid var(--comment); line-height: 1.5;
+  max-height: 72px; overflow: auto;
+}
+.od-composer textarea {
+  width: 100%; min-height: 64px; resize: vertical; background: var(--bg-inset);
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px;
+  font-size: 13.5px; font-family: var(--font-sans); color: var(--text-primary); outline: none;
+}
+.od-composer-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.od-btn {
+  font-size: 12.5px; font-weight: 600; border-radius: 6px; padding: 5px 12px; cursor: pointer;
+}
+.od-btn-primary { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
+.od-btn-ghost { color: var(--text-muted); background: none; border: 1px solid transparent; }
+
+/* Orphan badge above a card */
+.od-orphan {
+  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--warning); margin-bottom: -4px;
+}
+
+.od-loading { display: flex; align-items: center; justify-content: center; height: 100vh; color: var(--text-muted); font-family: var(--font-mono); font-size: 13px; }
+.od-error { color: var(--danger); }

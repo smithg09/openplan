@@ -153,12 +153,17 @@ func TestEditReactDeleteAPI(t *testing.T) {
 	}
 }
 
-func TestFrameHasSandboxCSP(t *testing.T) {
+func TestFrameHeaders(t *testing.T) {
 	s, doc := newTestServer(t)
 	v, _ := doc.CreateVersion([]byte("<html><body>x</body></html>"), "", "", "")
 	w := do(t, s.Handler(), "GET", "/api/docs/report/versions/"+v.ID+"/frame", nil)
-	if csp := w.Header().Get("Content-Security-Policy"); csp != "sandbox allow-scripts" {
-		t.Errorf("CSP = %q, want sandbox allow-scripts", csp)
+	if w.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Error("missing nosniff on frame")
+	}
+	// No sandbox-CSP header: it blocks loading inside an already-sandboxed
+	// iframe. Isolation is the host iframe's sandbox attribute.
+	if csp := w.Header().Get("Content-Security-Policy"); csp != "" {
+		t.Errorf("frame should not send a CSP sandbox header, got %q", csp)
 	}
 }
 

@@ -171,10 +171,12 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Defense in depth: even if this URL is opened directly (outside the host's
-	// sandboxed iframe), the CSP sandbox gives it an opaque origin with scripts
-	// only — it can't reach the same-origin API or cookies.
-	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
+	// Isolation comes from the host embedding this in <iframe sandbox="allow-scripts">
+	// (no allow-same-origin => opaque origin, no API/cookie access). We do NOT
+	// also send a `Content-Security-Policy: sandbox` response header: Chromium
+	// blocks a sandbox-CSP document loaded inside an already-sandboxed frame
+	// (net::ERR_BLOCKED_BY_CLIENT). Hardening the direct-open case (serving
+	// frames from a sibling origin or behind a one-time token) is a follow-up.
 	_, _ = w.Write(render.Frame(content))
 }
 
