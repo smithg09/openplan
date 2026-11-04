@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
+import { X } from 'lucide-react';
 import { AnnoCard } from './AnnoCard';
 import { AnnoIcon } from './icons';
 
@@ -20,10 +21,13 @@ interface AnnotationsPanelProps {
   onRemove: (id: string) => void;
   onClose: () => void;
   onCopyMD?: () => void;
+  onResolve?: (id: string) => void;
+  onReply?: (id: string, body: string) => void;
+  onReact?: (id: string, emoji: string) => void;
 }
 
 export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
-  annotations, focusId, onFocus, onEdit, onRemove, onClose, onCopyMD,
+  annotations, focusId, onFocus, onEdit, onRemove, onClose, onCopyMD, onResolve, onReply, onReact,
 }) => {
   const [filter, setFilter] = React.useState('all');
 
@@ -66,9 +70,7 @@ export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
           onMouseEnter={e => { (e.currentTarget).style.color = 'var(--text-secondary)'; }}
           onMouseLeave={e => { (e.currentTarget).style.color = 'var(--text-faint)'; }}
         >
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M2 2l8 8M10 2l-8 8" />
-          </svg>
+          <X size={12} strokeWidth={1.6} />
         </button>
       </div>
 
@@ -131,6 +133,9 @@ export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
                 onClick={() => onFocus(a.id)}
                 onEdit={onEdit}
                 onRemove={() => onRemove(a.id)}
+                onResolve={onResolve}
+                onReply={onReply}
+                onReact={onReact}
               />
             ))}
           </div>

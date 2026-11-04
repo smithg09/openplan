@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
+import { Pencil, Trash2, Check, CheckCheck, Reply, SmilePlus } from 'lucide-react';
 import { AnnoIcon, ANNOTATION_TYPES } from './icons';
 
 function relTime(iso: string): string {
@@ -10,19 +11,13 @@ function relTime(iso: string): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-const PencilIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8.5 1.5l2 2-7 7H1.5v-2z" />
-  </svg>
-);
+const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀', '👀'];
 
-const TrashIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 3h8" /><path d="M4.5 3V2h3v1" />
-    <path d="M3.5 3l.5 7h4l.5-7" />
-    <path d="M5 5.5v3M7 5.5v3" />
-  </svg>
-);
+const iconBtn: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer', padding: '3px 5px',
+  color: 'var(--text-faint)', borderRadius: 4, display: 'inline-flex', alignItems: 'center',
+  transition: 'color 0.1s',
+};
 
 interface AnnoCardProps {
   anno: Annotation;
@@ -30,14 +25,24 @@ interface AnnoCardProps {
   onClick: () => void;
   onEdit: (id: string, body: string) => void;
   onRemove: () => void;
+  /** Toggle resolved. When omitted, the resolve control is hidden. */
+  onResolve?: (id: string) => void;
+  /** Add a threaded reply. When omitted, the reply composer is hidden. */
+  onReply?: (id: string, body: string) => void;
+  /** Toggle an emoji reaction. When omitted, the reaction control is hidden. */
+  onReact?: (id: string, emoji: string) => void;
 }
 
-export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEdit, onRemove }) => {
+export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEdit, onRemove, onResolve, onReply, onReact }) => {
   const meta = ANNOTATION_TYPES[anno.type] ?? ANNOTATION_TYPES['comment'];
   const anchor = anno.selectedText ?? '';
   const [editing, setEditing] = React.useState(false);
   const [editValue, setEditValue] = React.useState(anno.body ?? '');
+  const [replying, setReplying] = React.useState(false);
+  const [replyValue, setReplyValue] = React.useState('');
+  const [pickReaction, setPickReaction] = React.useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const replyRef = React.useRef<HTMLTextAreaElement>(null);
   const cardRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -53,12 +58,19 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
     }
   }, [editing, anno.body]);
 
-  const handleSave = () => {
-    onEdit(anno.id, editValue);
-    setEditing(false);
+  React.useEffect(() => { if (replying) replyRef.current?.focus(); }, [replying]);
+
+  const handleSave = () => { onEdit(anno.id, editValue); setEditing(false); };
+  const handleReply = () => {
+    if (replyValue.trim() && onReply) onReply(anno.id, replyValue.trim());
+    setReplyValue('');
+    setReplying(false);
   };
 
   const typeColor = `var(${meta.colorVar})`;
+  const resolved = !!anno.resolved;
+  const replies = anno.replies ?? [];
+  const reactions = anno.reactions ?? [];
 
   return (
     <div
@@ -70,8 +82,9 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
         borderRadius: 8,
         padding: '10px 12px',
         cursor: editing ? 'default' : 'pointer',
-        transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
+        transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s',
         marginBottom: 1,
+        opacity: resolved ? 0.6 : 1,
         boxShadow: isFocus ? `0 0 0 3px color-mix(in srgb, ${typeColor} 16%, transparent)` : 'none',
       }}
     >
@@ -89,6 +102,16 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: typeColor, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
           {meta.label}
         </span>
+        {resolved && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
+            color: 'var(--teal)', background: 'color-mix(in srgb, var(--teal) 14%, transparent)',
+            borderRadius: 10, padding: '1px 6px', textTransform: 'uppercase', letterSpacing: '0.05em',
+          }}>
+            <CheckCheck size={10} strokeWidth={2} /> resolved
+          </span>
+        )}
         <div style={{ flex: 1 }} />
         {anno.author && (
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)', marginRight: 4 }}>
@@ -96,7 +119,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
           </span>
         )}
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-faint)' }}>
-          {relTime(anno.createdAt)}
+          {relTime(anno.createdAt)}{anno.edited ? ' · edited' : ''}
         </span>
       </div>
 
@@ -106,9 +129,9 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
           display: 'flex', alignItems: 'flex-start', gap: 6,
           fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)',
           background: 'var(--bg-inset)', border: '1px solid var(--border)',
+          borderLeft: `2px solid ${typeColor}`,
           borderRadius: 5, padding: '5px 8px', marginBottom: 7,
         }}>
-          <span style={{ color: typeColor, opacity: 0.7, fontSize: 14, lineHeight: 1, marginTop: 1, flexShrink: 0 }}>&ldquo;</span>
           <span>{anchor.length > 72 ? anchor.slice(0, 70) + '…' : anchor}</span>
         </div>
       )}
@@ -163,51 +186,131 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({ anno, isFocus, onClick, onEd
             }}
           />
           <div style={{ display: 'flex', gap: 6, marginTop: 5, justifyContent: 'flex-end' }}>
-            <button
-              onClick={e => { e.stopPropagation(); setEditing(false); }}
-              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-            >
+            <button onClick={e => { e.stopPropagation(); setEditing(false); }}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
               cancel
             </button>
-            <button
-              onClick={e => { e.stopPropagation(); handleSave(); }}
-              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-            >
+            <button onClick={e => { e.stopPropagation(); handleSave(); }}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
               save
             </button>
           </div>
         </div>
       )}
 
-      {/* Footer actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-        {!editing && anno.type !== 'emoji' && anno.type !== 'deletion' && (
-          <button
-            title="Edit"
-            onClick={e => { e.stopPropagation(); setEditing(true); }}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: '3px 5px',
-              color: 'var(--text-faint)', borderRadius: 4, display: 'flex', alignItems: 'center',
-              transition: 'color 0.1s',
+      {/* Reactions */}
+      {(reactions.length > 0 || (onReact && pickReaction)) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+          {reactions.map(r => (
+            <button key={r.emoji} onClick={e => { e.stopPropagation(); onReact?.(anno.id, r.emoji); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3, cursor: onReact ? 'pointer' : 'default',
+                fontSize: 11, padding: '1px 6px', borderRadius: 10,
+                border: `1px solid ${r.reactedByMe ? 'var(--accent)' : 'var(--border)'}`,
+                background: r.reactedByMe ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-inset)',
+                color: 'var(--text-secondary)',
+              }}>
+              <span>{r.emoji}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5 }}>{r.count}</span>
+            </button>
+          ))}
+          {onReact && pickReaction && QUICK_REACTIONS.filter(e => !reactions.some(r => r.emoji === e)).map(e => (
+            <button key={e} onClick={ev => { ev.stopPropagation(); onReact(anno.id, e); setPickReaction(false); }}
+              style={{ fontSize: 12, padding: '1px 5px', borderRadius: 10, border: '1px dashed var(--border)', background: 'none', cursor: 'pointer' }}>
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Replies */}
+      {replies.length > 0 && (
+        <div style={{ borderLeft: '2px solid var(--border)', paddingLeft: 8, margin: '2px 0 6px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {replies.map(rep => (
+            <div key={rep.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-secondary)' }}>@{rep.author}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--text-faint)' }}>{relTime(rep.createdAt)}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>{rep.body}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Reply composer */}
+      {onReply && replying && (
+        <div style={{ marginBottom: 6 }}>
+          <textarea
+            ref={replyRef}
+            value={replyValue}
+            onChange={e => setReplyValue(e.target.value)}
+            placeholder="Reply…"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => {
+              if (e.key === 'Escape') { setReplying(false); setReplyValue(''); }
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleReply(); }
             }}
-            onMouseEnter={e => { (e.currentTarget).style.color = 'var(--text-secondary)'; }}
-            onMouseLeave={e => { (e.currentTarget).style.color = 'var(--text-faint)'; }}
-          >
-            <PencilIcon />
+            style={{
+              width: '100%', minHeight: 48, resize: 'vertical',
+              background: 'var(--bg-inset)', border: '1px solid var(--border)',
+              borderRadius: 5, padding: '6px 8px', fontSize: 12,
+              fontFamily: 'var(--font-sans)', color: 'var(--text-primary)',
+              outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 6, marginTop: 5, justifyContent: 'flex-end' }}>
+            <button onClick={e => { e.stopPropagation(); setReplying(false); setReplyValue(''); }}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+              cancel
+            </button>
+            <button onClick={e => { e.stopPropagation(); handleReply(); }} disabled={!replyValue.trim()}
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
+              reply
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Footer actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 4 }}>
+        {!editing && anno.type !== 'emoji' && anno.type !== 'deletion' && (
+          <button title="Edit" style={iconBtn}
+            onClick={e => { e.stopPropagation(); setEditing(true); }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
+            <Pencil size={12} strokeWidth={1.6} />
           </button>
         )}
-        <button
-          title="Remove"
+        {onReply && (
+          <button title="Reply" style={iconBtn}
+            onClick={e => { e.stopPropagation(); setReplying(v => !v); }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
+            <Reply size={13} strokeWidth={1.6} />
+          </button>
+        )}
+        {onReact && (
+          <button title="React" style={iconBtn}
+            onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
+            <SmilePlus size={13} strokeWidth={1.6} />
+          </button>
+        )}
+        {onResolve && (
+          <button title={resolved ? 'Reopen' : 'Resolve'} style={{ ...iconBtn, color: resolved ? 'var(--teal)' : 'var(--text-faint)' }}
+            onClick={e => { e.stopPropagation(); onResolve(anno.id); }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--teal)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = resolved ? 'var(--teal)' : 'var(--text-faint)'; }}>
+            {resolved ? <CheckCheck size={13} strokeWidth={1.8} /> : <Check size={13} strokeWidth={1.8} />}
+          </button>
+        )}
+        <button title="Remove" style={iconBtn}
           onClick={e => { e.stopPropagation(); onRemove(); }}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '3px 5px',
-            color: 'var(--text-faint)', borderRadius: 4, display: 'flex', alignItems: 'center',
-            transition: 'color 0.1s',
-          }}
-          onMouseEnter={e => { (e.currentTarget).style.color = 'var(--danger)'; }}
-          onMouseLeave={e => { (e.currentTarget).style.color = 'var(--text-faint)'; }}
-        >
-          <TrashIcon />
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
+          <Trash2 size={12} strokeWidth={1.6} />
         </button>
         <div style={{ flex: 1 }} />
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--text-faint)', opacity: 0.6 }}>

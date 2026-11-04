@@ -114,6 +114,102 @@ export interface Annotation {
   author: string;
   createdAt: string;
   resolved: boolean;
+  // ── opendocs / richer-comment fields (all optional; openplan ignores them) ──
+  /** Quote-based anchor (W3C TextQuote/TextPosition). Preferred over startMeta/endMeta for HTML docs. */
+  anchor?: CommentAnchor;
+  /** Version this annotation was first created on (opendocs immutable versioning). */
+  createdOnVersion?: number;
+  /** Threaded replies (doc-scoped comment model). */
+  replies?: CommentReply[];
+  /** Emoji reactions aggregated by emoji. */
+  reactions?: CommentReaction[];
+  /** True once edited after creation. */
+  edited?: boolean;
+  /** Timestamp the annotation was resolved (companion to `resolved`). */
+  resolvedAt?: string;
+}
+
+/**
+ * Quote-based comment anchor — the slashdocs / W3C Web Annotation wire shape.
+ * `quote`+`prefix`+`suffix` → TextQuoteSelector (re-anchors across versions);
+ * `startOffset`/`endOffset` → TextPositionSelector (char offsets into body textContent).
+ */
+export interface CommentAnchor {
+  quote: string;
+  prefix?: string;
+  suffix?: string;
+  startOffset?: number;
+  endOffset?: number;
+}
+
+export interface CommentAuthor {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
+export interface CommentReaction {
+  emoji: string;
+  count: number;
+  /** Whether the current viewer has reacted with this emoji. */
+  reactedByMe?: boolean;
+  reactors?: string[];
+}
+
+export interface CommentReply {
+  id: string;
+  body: string;
+  author: string;
+  createdAt: string;
+  edited?: boolean;
+  reactions?: CommentReaction[];
+}
+
+// ── opendocs document model (HTML docs; doc-scoped comments) ─────────────────
+
+export interface DocVersion {
+  /** Stable id (e.g. content hash or ULID). */
+  id: string;
+  number: number;
+  /** Parent version id, for lineage. */
+  parentId?: string;
+  contentHash: string;
+  createdAt: string;
+  label?: string;
+  /** Short "what changed" summary. */
+  summary?: string;
+}
+
+export interface DocComment {
+  id: string;
+  /** Document-scoped; carries the version it was authored on. */
+  createdOnVersionId: string;
+  anchor: CommentAnchor;
+  body: string;
+  author: CommentAuthor;
+  createdAt: string;
+  status: 'open' | 'resolved';
+  resolvedAt?: string;
+  edited?: boolean;
+  /** null/undefined = top-level; otherwise the thread root id. */
+  rootCommentId?: string;
+  replies?: DocComment[];
+  reactions?: CommentReaction[];
+  /** True when the anchor could not be re-matched in the viewed version. */
+  orphaned?: boolean;
+}
+
+export interface DocMeta {
+  id: string;
+  slug: string;
+  title: string;
+  projectSlug?: string;
+  createdAt: string;
+  updatedAt: string;
+  currentVersionId: string;
+  totalVersions: number;
+  labels?: string[];
+  folderId?: string;
 }
 
 export interface AnnotationEventDetail {

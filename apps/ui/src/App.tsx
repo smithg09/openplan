@@ -26,7 +26,7 @@ export default function App() {
     approveFlow, toasts, slug, title, version, initialized, loading, selectedFile, dirFiles,
     fileAnnotationCounts,
     setTheme,
-    addAnnotation, removeAnnotation, updateAnnotation, setFocusedAnnotation, setPanelOpen,
+    addAnnotation, removeAnnotation, updateAnnotation, resolveAnnotation, setFocusedAnnotation, setPanelOpen,
     startApprove, startSend, tickCountdown, resetApprove,
     pushToast, dismissToast,
     initializeFromAPI, setLoading, setSelectedFile, setPlanContent, hasEdits,
@@ -501,6 +501,7 @@ export default function App() {
             onFocus={setFocusedAnnotation}
             onEdit={updateAnnotation}
             onRemove={removeAnnotation}
+            onResolve={resolveAnnotation}
             onClose={() => setPanelOpen(false)}
             onCopyMD={() => {
               const md = exportAnnotationsToMarkdown(annotations, plan);

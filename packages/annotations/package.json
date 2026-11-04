@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@openplan/shared": "*"
+    "@openplan/shared": "*",
+    "lucide-react": "^1.68.0"
   },
   "peerDependencies": {
     "react": "^18.0.0",
