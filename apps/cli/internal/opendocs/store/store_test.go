@@ -190,12 +190,76 @@ func TestComments(t *testing.T) {
 	}
 }
 
+func TestEditDeleteReact(t *testing.T) {
+	d := newTestDoc(t)
+	v, _ := d.CreateVersion([]byte("<p>text</p>"), "", "", "")
+	root, _ := d.AddComment(Comment{Body: "orig", CreatedOnVersionID: v.ID, Anchor: &Anchor{Quote: "text"}})
+	reply, _ := d.AddComment(Comment{Body: "re", CreatedOnVersionID: v.ID, RootCommentID: root.ID})
+
+	// Edit.
+	if err := d.EditComment(root.ID, "updated"); err != nil {
+		t.Fatalf("EditComment: %v", err)
+	}
+	comments, _ := d.ListComments()
+	for _, c := range comments {
+		if c.ID == root.ID {
+			if c.Body != "updated" || !c.Edited {
+				t.Errorf("edit not applied: body=%q edited=%v", c.Body, c.Edited)
+			}
+		}
+	}
+
+	// React toggle: add, then remove.
+	if err := d.ToggleReaction(root.ID, "👍", "smith"); err != nil {
+		t.Fatalf("ToggleReaction add: %v", err)
+	}
+	comments, _ = d.ListComments()
+	if got := reactionUsers(comments, root.ID, "👍"); len(got) != 1 {
+		t.Errorf("want 1 reactor, got %v", got)
+	}
+	if err := d.ToggleReaction(root.ID, "👍", "smith"); err != nil {
+		t.Fatalf("ToggleReaction remove: %v", err)
+	}
+	comments, _ = d.ListComments()
+	if got := reactionUsers(comments, root.ID, "👍"); got != nil {
+		t.Errorf("reaction should be gone, got %v", got)
+	}
+
+	// Delete root also removes its reply.
+	if err := d.DeleteComment(root.ID); err != nil {
+		t.Fatalf("DeleteComment: %v", err)
+	}
+	comments, _ = d.ListComments()
+	if len(comments) != 0 {
+		t.Errorf("want 0 comments after deleting root+reply, got %d", len(comments))
+	}
+	_ = reply
+
+	if err := d.DeleteComment("ghost"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("want ErrNotFound, got %v", err)
+	}
+}
+
+func reactionUsers(comments []Comment, id, emoji string) []string {
+	for _, c := range comments {
+		if c.ID != id {
+			continue
+		}
+		for _, r := range c.Reactions {
+			if r.Emoji == emoji {
+				return r.Users
+			}
+		}
+	}
+	return nil
+}
+
 func TestSlug(t *testing.T) {
 	cases := map[string]string{
 		"My Report.html": "my-report-html",
-		"  spaced  ":      "spaced",
-		"":                "untitled",
-		"Already-Good":    "already-good",
+		"  spaced  ":     "spaced",
+		"":               "untitled",
+		"Already-Good":   "already-good",
 	}
 	for in, want := range cases {
 		if got := Slug(in); got != want {

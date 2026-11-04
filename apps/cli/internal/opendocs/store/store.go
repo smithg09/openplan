@@ -79,6 +79,7 @@ type Comment struct {
 	RootCommentID      string     `json:"rootCommentId,omitempty"`
 	Status             string     `json:"status"` // "open" or "resolved"
 	Reactions          []Reaction `json:"reactions,omitempty"`
+	Edited             bool       `json:"edited,omitempty"`
 	CreatedAt          string     `json:"createdAt"`
 	UpdatedAt          string     `json:"updatedAt,omitempty"`
 }
@@ -341,6 +342,101 @@ func (d *Doc) SetCommentStatus(id, status string) error {
 		}
 	}
 	return fmt.Errorf("%w: comment %q", ErrNotFound, id)
+}
+
+// EditComment replaces a comment's body and marks it edited.
+func (d *Doc) EditComment(id, body string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	comments, err := d.loadComments()
+	if err != nil {
+		return err
+	}
+	for i := range comments {
+		if comments[i].ID == id {
+			comments[i].Body = body
+			comments[i].Edited = true
+			comments[i].UpdatedAt = nowRFC3339()
+			return d.saveComments(comments)
+		}
+	}
+	return fmt.Errorf("%w: comment %q", ErrNotFound, id)
+}
+
+// DeleteComment removes a comment and, if it is a thread root, its replies.
+func (d *Doc) DeleteComment(id string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	comments, err := d.loadComments()
+	if err != nil {
+		return err
+	}
+	found := false
+	kept := comments[:0]
+	for _, c := range comments {
+		if c.ID == id || c.RootCommentID == id {
+			found = true
+			continue
+		}
+		kept = append(kept, c)
+	}
+	if !found {
+		return fmt.Errorf("%w: comment %q", ErrNotFound, id)
+	}
+	return d.saveComments(kept)
+}
+
+// ToggleReaction adds user's reaction with emoji, or removes it if already
+// present. An emoji with no users left is dropped.
+func (d *Doc) ToggleReaction(id, emoji, user string) error {
+	if emoji == "" {
+		return fmt.Errorf("opendocs: empty emoji")
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	comments, err := d.loadComments()
+	if err != nil {
+		return err
+	}
+	for i := range comments {
+		if comments[i].ID != id {
+			continue
+		}
+		comments[i].Reactions = toggleReaction(comments[i].Reactions, emoji, user)
+		comments[i].UpdatedAt = nowRFC3339()
+		return d.saveComments(comments)
+	}
+	return fmt.Errorf("%w: comment %q", ErrNotFound, id)
+}
+
+func toggleReaction(reactions []Reaction, emoji, user string) []Reaction {
+	for i := range reactions {
+		if reactions[i].Emoji != emoji {
+			continue
+		}
+		// Toggle user membership.
+		users := reactions[i].Users[:0]
+		removed := false
+		for _, u := range reactions[i].Users {
+			if u == user {
+				removed = true
+				continue
+			}
+			users = append(users, u)
+		}
+		if !removed {
+			users = append(users, user)
+		}
+		reactions[i].Users = users
+		if len(users) == 0 {
+			return append(reactions[:i], reactions[i+1:]...)
+		}
+		return reactions
+	}
+	return append(reactions, Reaction{Emoji: emoji, Users: []string{user}})
 }
 
 func (d *Doc) loadComments() ([]Comment, error) {

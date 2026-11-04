@@ -125,6 +125,43 @@ func TestCommentsAPI(t *testing.T) {
 	}
 }
 
+func TestEditReactDeleteAPI(t *testing.T) {
+	s, doc := newTestServer(t)
+	v, _ := doc.CreateVersion([]byte("<p>x</p>"), "", "", "")
+	h := s.Handler()
+
+	w := do(t, h, "POST", "/api/docs/report/comments", store.Comment{Body: "orig", CreatedOnVersionID: v.ID, Anchor: &store.Anchor{Quote: "x"}})
+	var c store.Comment
+	_ = json.Unmarshal(w.Body.Bytes(), &c)
+
+	if w = do(t, h, "POST", "/api/docs/report/comments/"+c.ID+"/edit", editReq{Body: "updated"}); w.Code != http.StatusOK {
+		t.Fatalf("edit: %d %s", w.Code, w.Body)
+	}
+	if w = do(t, h, "POST", "/api/docs/report/comments/"+c.ID+"/react", reactReq{Emoji: "👍", User: "me"}); w.Code != http.StatusOK {
+		t.Fatalf("react: %d %s", w.Code, w.Body)
+	}
+	w = do(t, h, "GET", "/api/docs/report/comments", nil)
+	if !strings.Contains(w.Body.String(), "updated") || !strings.Contains(w.Body.String(), "👍") {
+		t.Errorf("edit/react not reflected: %s", w.Body)
+	}
+	if w = do(t, h, "DELETE", "/api/docs/report/comments/"+c.ID, nil); w.Code != http.StatusOK {
+		t.Fatalf("delete: %d %s", w.Code, w.Body)
+	}
+	w = do(t, h, "GET", "/api/docs/report/comments", nil)
+	if strings.Contains(w.Body.String(), c.ID) {
+		t.Errorf("comment not deleted: %s", w.Body)
+	}
+}
+
+func TestFrameHasSandboxCSP(t *testing.T) {
+	s, doc := newTestServer(t)
+	v, _ := doc.CreateVersion([]byte("<html><body>x</body></html>"), "", "", "")
+	w := do(t, s.Handler(), "GET", "/api/docs/report/versions/"+v.ID+"/frame", nil)
+	if csp := w.Header().Get("Content-Security-Policy"); csp != "sandbox allow-scripts" {
+		t.Errorf("CSP = %q, want sandbox allow-scripts", csp)
+	}
+}
+
 func TestPlaceholderServedAtRoot(t *testing.T) {
 	s, _ := newTestServer(t)
 	w := do(t, s.Handler(), "GET", "/", nil)

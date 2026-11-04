@@ -298,5 +298,14 @@
     setTimeout(onSelection, 0);
   });
 
-  send({ type: "opendocs:ready" });
+  // Announce readiness only once <body> exists — the bridge is injected at the
+  // top of <head>, so buildIndex() would otherwise walk a null document.body.
+  function ready() {
+    send({ type: "opendocs:ready" });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ready);
+  } else {
+    ready();
+  }
 })();

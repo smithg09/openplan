@@ -56,6 +56,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/docs/{doc}/comments", s.handleListComments)
 	mux.HandleFunc("POST /api/docs/{doc}/comments", s.handleAddComment)
 	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/status", s.handleCommentStatus)
+	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/edit", s.handleEditComment)
+	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/react", s.handleReactComment)
+	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.handleDeleteComment)
 
 	mux.Handle("/", s.uiHandler())
 	return mux
@@ -168,6 +171,10 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Defense in depth: even if this URL is opened directly (outside the host's
+	// sandboxed iframe), the CSP sandbox gives it an opaque origin with scripts
+	// only — it can't reach the same-origin API or cookies.
+	w.Header().Set("Content-Security-Policy", "sandbox allow-scripts")
 	_, _ = w.Write(render.Frame(content))
 }
 
@@ -215,6 +222,64 @@ func (s *Server) handleCommentStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+type editReq struct {
+	Body string `json:"body"`
+}
+
+func (s *Server) handleEditComment(w http.ResponseWriter, r *http.Request) {
+	var req editReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	err := s.doc(r).EditComment(r.PathValue("id"), req.Body)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+type reactReq struct {
+	Emoji string `json:"emoji"`
+	User  string `json:"user"`
+}
+
+func (s *Server) handleReactComment(w http.ResponseWriter, r *http.Request) {
+	var req reactReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	err := s.doc(r).ToggleReaction(r.PathValue("id"), req.Emoji, req.User)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	err := s.doc(r).DeleteComment(r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
