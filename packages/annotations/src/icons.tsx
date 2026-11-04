@@ -1,4 +1,13 @@
 import React from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Comment01Icon, HelpCircleIcon, Idea01Icon, Delete02Icon, SmileIcon, HighlighterIcon,
+  Tick02Icon, CheckmarkSquare01Icon, ReplyIcon, Link01Icon, Edit02Icon, CheckmarkCircle02Icon,
+  Cancel01Icon, Share08Icon, Menu01Icon, Moon02Icon, Sun03Icon, ContrastIcon, File01Icon,
+  CodeSquareIcon, Download04Icon, GlobeIcon, LinkSquare02Icon, User03Icon, LeftToRightListBulletIcon,
+  Folder01Icon, ComputerTerminal01Icon, SourceCodeIcon, RoboticIcon, FlashIcon, DashboardSquare01Icon,
+  UndoIcon, Copy01Icon, ViewIcon, ViewOffIcon, Alert02Icon,
+} from '@hugeicons/core-free-icons';
 
 export const ANNOTATION_TYPES: Record<string, { label: string; colorVar: string; letter: string }> = {
   comment:    { label: 'Comment',  colorVar: '--comment',    letter: 'C' },
@@ -8,33 +17,94 @@ export const ANNOTATION_TYPES: Record<string, { label: string; colorVar: string;
   emoji:      { label: 'Reaction', colorVar: '--text-muted', letter: 'E' },
 };
 
-export const CustomIcon: React.FC<{ type: string; size?: number }> = ({ type, size = 12 }) => {
-  const props = {
-    width: size, height: size, viewBox: '0 0 16 16',
-    fill: 'none', stroke: 'currentColor', strokeWidth: 1.4,
-    strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
-  };
-  switch (type) {
-    case 'comment':
-      return <svg {...props}><path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 13.5 4v5A1.5 1.5 0 0 1 12 10.5H6.5L4 13v-2.5a1.5 1.5 0 0 1-1.5-1.5z" /><circle cx="6" cy="6.5" r=".5" fill="currentColor" stroke="none" /><circle cx="8" cy="6.5" r=".5" fill="currentColor" stroke="none" /><circle cx="10" cy="6.5" r=".5" fill="currentColor" stroke="none" /></svg>;
-    case 'question':
-      return <svg {...props}><rect x="2" y="2" width="12" height="12" rx="3" /><path d="M6 6.2a2 2 0 1 1 2.8 1.8c-.5.3-.8.6-.8 1.2v.3" /><circle cx="8" cy="11.5" r=".55" fill="currentColor" stroke="none" /></svg>;
-    case 'highlight':
-      return <svg {...props}><path d="M9.5 2.5l4 4-6 6-3 1 1-3z" /><path d="M7.5 4.5l4 4" /><path d="M2.5 13.5h11" strokeWidth="2" opacity=".5" /></svg>;
-    case 'approval':
-      return <svg {...props} strokeWidth={2}><path d="M3 8.5l3.5 3.5L13 5.5" /></svg>;
-    case 'emoji':
-      return <svg {...props}><circle cx="8" cy="8" r="5.5" /><circle cx="6" cy="7" r=".7" fill="currentColor" stroke="none" /><circle cx="10" cy="7" r=".7" fill="currentColor" stroke="none" /><path d="M5.5 9.5c.6 1 1.4 1.5 2.5 1.5s1.9-.5 2.5-1.5" /></svg>;
-    case 'deletion':
-      return <svg {...props}><path d="M3 4.5h10" /><path d="M6 4.5V3a.5.5 0 0 1 .5-.5h3A.5.5 0 0 1 10 3v1.5" /><path d="M4.5 4.5l.6 8.5a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.6-8.5" /><path d="M6.5 7v4M9.5 7v4" /></svg>;
-    case 'suggestion':
-      return <svg {...props}><path d="M10 2.5l3.5 3.5-7.5 7.5H2.5v-3.5L10 2.5z" /><path d="M8.5 4l3 3" strokeWidth="1.2" opacity=".55" /></svg>;
-    case 'action-item':
-      return <svg {...props}><rect x="2.5" y="2.5" width="11" height="11" rx="2.2" /><path d="M5.5 8.5l1.8 1.8 3.2-3.6" strokeWidth="1.6" /></svg>;
-    default:
-      return null;
-  }
+// ── Icon system: Hugeicons ───────────────────────────────────────────────────
+// One registry shared across the whole product (annotations, toolbar, app chrome,
+// marketing site). Call sites pass a stable semantic `name`; swapping the icon
+// set later is a one-file change. SCALE nudges every glyph up a touch.
+const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
+  // annotation types
+  chat_bubble: Comment01Icon,
+  help: HelpCircleIcon,
+  lightbulb: Idea01Icon,
+  delete: Delete02Icon,
+  mood: SmileIcon,
+  ink_highlighter: HighlighterIcon,
+  check: Tick02Icon,
+  check_box: CheckmarkSquare01Icon,
+  // comment card actions
+  add_reaction: SmileIcon,
+  reply: ReplyIcon,
+  link: Link01Icon,
+  edit: Edit02Icon,
+  check_circle: CheckmarkCircle02Icon,
+  close: Cancel01Icon,
+  // app chrome
+  share: Share08Icon,
+  menu: Menu01Icon,
+  dark_mode: Moon02Icon,
+  light_mode: Sun03Icon,
+  brightness_auto: ContrastIcon,
+  markdown: File01Icon,
+  data_object: CodeSquareIcon,
+  download: Download04Icon,
+  language: GlobeIcon,
+  open_in_new: LinkSquare02Icon,
+  person: User03Icon,
+  format_list_bulleted: LeftToRightListBulletIcon,
+  folder: Folder01Icon,
+  description: File01Icon,
+  // marketing / misc
+  terminal: ComputerTerminal01Icon,
+  code: SourceCodeIcon,
+  smart_toy: RoboticIcon,
+  bolt: FlashIcon,
+  space_dashboard: DashboardSquare01Icon,
+  undo: UndoIcon,
+  content_copy: Copy01Icon,
+  visibility: ViewIcon,
+  visibility_off: ViewOffIcon,
+  warning: Alert02Icon,
 };
+
+const SCALE = 1.05;
+
+interface IconProps {
+  name: string;
+  size?: number;
+  /** Accepted for call-site compatibility; Hugeicons glyphs don't use them. */
+  fill?: boolean;
+  weight?: number;
+  color?: string;
+  strokeWidth?: number;
+  style?: React.CSSProperties;
+  className?: string;
+}
+export const Icon: React.FC<IconProps> = ({ name, size = 16, color, strokeWidth, style, className }) => (
+  <HugeiconsIcon
+    icon={REGISTRY[name] ?? Comment01Icon}
+    size={Math.round(size * SCALE)}
+    color={color ?? 'currentColor'}
+    strokeWidth={strokeWidth ?? 1.8}
+    className={className}
+    style={{ flexShrink: 0, ...style }}
+  />
+);
+
+// Annotation type → registry key.
+const LIGATURES: Record<string, string> = {
+  comment:       'chat_bubble',
+  question:      'help',
+  suggestion:    'lightbulb',
+  deletion:      'delete',
+  emoji:         'mood',
+  highlight:     'ink_highlighter',
+  approval:      'check',
+  'action-item': 'check_box',
+};
+
+export const CustomIcon: React.FC<{ type: string; size?: number }> = ({ type, size = 12 }) => (
+  <Icon name={LIGATURES[type] ?? 'chat_bubble'} size={size} />
+);
 
 export const AnnoIcon: React.FC<{ type: string; size?: number }> = ({ type, size = 12 }) => {
   const meta = ANNOTATION_TYPES[type] ?? ANNOTATION_TYPES['comment'];

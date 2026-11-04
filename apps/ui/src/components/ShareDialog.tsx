@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from './Primitives';
+import { Icon } from '@openplan/annotations';
 import type { Annotation } from '@openplan/shared';
 import { encodeSharePayload } from '../lib/share';
 
@@ -48,7 +49,7 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ plan, annotations, tit
       <div className="op-modal" style={{ width: 480 }} onClick={e => e.stopPropagation()}>
         <div className="op-modal-head">
           <span className="op-modal-title">// share plan</span>
-          <Button kind="ghost" size="sm" onClick={onClose}>×</Button>
+          <Button kind="ghost" size="sm" onClick={onClose} icon={<Icon name="close" size={14} />} title="Close" />
         </div>
         <div className="op-modal-body">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
@@ -76,11 +77,14 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ plan, annotations, tit
             borderRadius: 5, padding: '0 0 0 10px',
             fontFamily: 'var(--font-mono)', fontSize: 11.5,
           }}>
+            <span style={{ color: 'var(--text-faint)', display: 'inline-flex', marginRight: 7 }}>
+              <Icon name="link" size={13} />
+            </span>
             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: url ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
               {url || 'generating…'}
             </span>
-            <Button kind="ghost" size="sm" onClick={copy} style={{ borderLeft: '1px solid var(--border)', borderRadius: 0 }}>
-              {copied ? 'copied ✓' : 'copy'}
+            <Button kind="ghost" size="sm" onClick={copy} icon={<Icon name={copied ? 'check' : 'content_copy'} size={13} />} style={{ borderLeft: '1px solid var(--border)', borderRadius: 0 }}>
+              {copied ? 'copied' : 'copy'}
             </Button>
           </div>
           <div style={{
@@ -88,8 +92,12 @@ export const ShareDialog: React.FC<ShareDialogProps> = ({ plan, annotations, tit
             background: 'color-mix(in oklab, var(--warning) 10%, transparent)',
             borderRadius: 5, fontSize: 11.5,
             color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)',
+            display: 'flex', alignItems: 'center', gap: 7,
           }}>
-            ⚠ link contains full plan text · anyone with the link can view
+            <span style={{ color: 'var(--warning)', display: 'inline-flex', flexShrink: 0 }}>
+              <Icon name="warning" size={14} />
+            </span>
+            <span>link contains full plan text · anyone with the link can view</span>
           </div>
         </div>
         <div className="op-modal-foot">

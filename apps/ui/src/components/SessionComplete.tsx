@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@openplan/annotations';
 import { Button } from './Primitives';
 import type { ApproveFlow } from '../store';
 import { useStore } from '../store';
@@ -43,9 +44,7 @@ export const SessionComplete: React.FC<SessionCompleteProps> = ({ flow, onCancel
           {phase === 'submitting' ? (
             <div className="op-session-spinner" />
           ) : (
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 18l7 7 14-15" />
-            </svg>
+            <Icon name="check" size={34} weight={600} />
           )}
         </div>
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-04
+
+### Added
+
+- **Hugeicons icon system** — replaced the hand-rolled SVG icons across the review UI, app chrome, and marketing site with the [Hugeicons](https://hugeicons.com) library, driven by a single shared registry in `@openplan/annotations`
+- **Threaded comments** — annotation cards now support replies, emoji reactions, and resolve/reopen
+- **Anchored comment rail** — comment cards are positioned at their highlight's scroll offset with two-way scroll sync, and the rail scrolls independently so overflowed comments stay reachable
+
+### Changed
+
+- **Redesigned comment cards** — slashdocs-style cards with author, relative time, quoted selection, status pill, and a cleaner action row; tightened border radii to match the rest of the UI
+- **Smoother card hover** — expanded cards reveal with a quick transition and neighbouring cards glide into place instead of snapping
+- **Shared review engine** — extended the annotation data model (anchors, replies, reactions, doc-scoped comments) so it can be reused beyond plan review
+
 ## [0.4.0] - 2026-07-27
 
 ### Added
@@ -46,7 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Session management** — `openplan sessions` lists all active openplan sessions (PID, port, mode)
 - **Claude Code plugin** — plugin manifest with hooks (`PreToolUse`, `PermissionRequest`) and skills (`openplan`, `openplan-annotate`, `openplan-archive`, `openplan-last`)
 
-[Unreleased]: https://github.com/smithg09/openplan/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/smithg09/openplan/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/smithg09/openplan/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/smithg09/openplan/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/smithg09/openplan/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/smithg09/openplan/compare/v0.1.0...v0.2.0

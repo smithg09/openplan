@@ -59,7 +59,11 @@ nav {
 .ncta {
   display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px;
   border-radius: 6px; background: var(--accent); color: #fff;
-  font-size: 13px; font-weight: 600; transition: background 80ms;
+  font-size: 13px; font-weight: 600; transition: background 100ms;
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent) 70%, #000),
+    0 3px 12px color-mix(in oklab, var(--accent) 26%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.15);
 }
 .ncta:hover { background: var(--accent-hover); }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { Annotation } from '@openplan/shared';
 import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
 import { AnnoCard } from '@openplan/annotations';
-import { CheckSmIcon, CopyIcon } from '../icons';
+import { CheckSmIcon, CopyIcon, Icon } from '../icons';
 
 // ── DOM search and highlight logic ──
 
@@ -505,15 +505,9 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
             title={showHighlights ? 'Hide highlights' : 'Show highlights'}
           >
             {showHighlights ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
-              </svg>
+              <Icon name="visibility" size={16} />
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
+              <Icon name="visibility_off" size={16} />
             )}
             <span className="op-btn-label">{showHighlights ? 'Hide' : 'Show'}</span>
           </button>
@@ -538,10 +532,7 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
                 onClick={handleClearAll}
                 title="Clear all annotations"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
+                <Icon name="delete" size={15} />
                 <span className="op-btn-label op-btn-label-desktop-hide">Clear</span>
               </button>
             </>
