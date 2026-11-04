@@ -20,45 +20,60 @@ interface CommentRailProps {
 }
 
 const GAP = 12;
+const PAD_BOTTOM = 80;
 
 /**
- * Anchored comment rail — each card floats at the vertical position of its
- * highlight (via `[data-bind-id]`) in the scroll container, collision-resolved
- * downward, and repositions on scroll/resize. The focused card expands; the
- * rest render compact. Cards whose anchor can't be found stack at the bottom.
+ * Anchored comment rail — each card sits at the absolute vertical position of
+ * its highlight (via `[data-bind-id]`) in the scroll container, collision-
+ * resolved downward. The rail is its own scroll area whose scroll position is
+ * kept in sync with the document (both ways), so cards stay glued to their
+ * anchors AND you can scroll the rail to reach overflowed comments. The
+ * focused/hovered card expands; the rest render compact. Cards whose anchor
+ * can't be found stack at the bottom.
  */
 export const CommentRail: React.FC<CommentRailProps> = ({
   annotations, focusId, onFocus, onEdit, onRemove, onResolve, onReply, onReact, onCopyLink, onClose, onCopyMD,
   scrollSelector = '.op-plan-wrap',
 }) => {
   const viewportRef = React.useRef<HTMLDivElement>(null);
+  const innerRef = React.useRef<HTMLDivElement>(null);
   const cardRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
   const rafRef = React.useRef<number | null>(null);
+  const syncingRef = React.useRef(false);
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
 
+  const getScrollEl = React.useCallback(
+    () => document.querySelector(scrollSelector) as HTMLElement | null,
+    [scrollSelector],
+  );
+
+  // Position cards at their anchor's absolute content Y; size the inner track
+  // to match the document so the rail scrolls over the same range.
   const reflow = React.useCallback(() => {
     const viewport = viewportRef.current;
-    const scrollEl = document.querySelector(scrollSelector);
-    if (!viewport || !scrollEl) return;
-    const vpTop = viewport.getBoundingClientRect().top;
+    const inner = innerRef.current;
+    const scrollEl = getScrollEl();
+    if (!viewport || !inner || !scrollEl) return;
 
-    type Item = { id: string; el: HTMLDivElement; h: number; desired: number | null; top: number };
+    inner.style.height = `${scrollEl.scrollHeight}px`;
+    const wrapTop = scrollEl.getBoundingClientRect().top;
+    const scrollTop = scrollEl.scrollTop;
+
+    type Item = { el: HTMLDivElement; h: number; anchor: number | null; top: number };
     const items: Item[] = [];
     for (const a of annotations) {
       const el = cardRefs.current.get(a.id);
       if (!el) continue;
       const mark = scrollEl.querySelector(`[data-bind-id="${a.id}"]`) as HTMLElement | null;
-      const desired = mark ? mark.getBoundingClientRect().top - vpTop : null;
-      items.push({ id: a.id, el, h: el.offsetHeight, desired, top: 0 });
+      const anchor = mark ? (mark.getBoundingClientRect().top - wrapTop) + scrollTop : null;
+      items.push({ el, h: el.offsetHeight, anchor, top: 0 });
     }
 
-    const anchored = items.filter(i => i.desired != null).sort((x, y) => (x.desired! - y.desired!));
-    const unanchored = items.filter(i => i.desired == null);
-
-    // Nudge the focused card to sit exactly at its anchor; others flow around it.
+    const anchored = items.filter(i => i.anchor != null).sort((x, y) => (x.anchor! - y.anchor!));
+    const unanchored = items.filter(i => i.anchor == null);
     let cursor = -Infinity;
     for (const it of anchored) {
-      let top = it.desired!;
+      let top = it.anchor!;
       if (cursor !== -Infinity && top < cursor + GAP) top = cursor + GAP;
       it.top = top;
       cursor = top + it.h;
@@ -68,36 +83,62 @@ export const CommentRail: React.FC<CommentRailProps> = ({
       it.top = top;
       cursor = top + it.h;
     }
+    for (const it of items) it.el.style.top = `${Math.round(it.top)}px`;
 
-    for (const it of items) {
-      it.el.style.transform = `translateY(${Math.round(it.top)}px)`;
-      it.el.style.opacity = it.desired == null ? '1' : (it.top + it.h < 0 ? '0' : '1');
+    // Grow the track if stacked cards extend past the document height.
+    if (cursor !== -Infinity && cursor + PAD_BOTTOM > scrollEl.scrollHeight) {
+      inner.style.height = `${Math.round(cursor + PAD_BOTTOM)}px`;
     }
-  }, [annotations, scrollSelector]);
+
+    // Keep the rail aligned with the document.
+    if (!syncingRef.current && Math.abs(viewport.scrollTop - scrollTop) > 1) {
+      syncingRef.current = true;
+      viewport.scrollTop = scrollTop;
+      syncingRef.current = false;
+    }
+  }, [annotations, getScrollEl]);
 
   const scheduleReflow = React.useCallback(() => {
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => { rafRef.current = null; reflow(); });
   }, [reflow]);
 
-  // Reposition on content scroll / window resize / content resize.
+  // Two-way scroll sync: doc → rail and rail → doc.
   React.useEffect(() => {
-    const scrollEl = document.querySelector(scrollSelector);
-    const body = scrollEl?.querySelector('.op-plan-body') ?? scrollEl;
-    scrollEl?.addEventListener('scroll', scheduleReflow, { passive: true });
+    const scrollEl = getScrollEl();
+    const viewport = viewportRef.current;
+    if (!scrollEl || !viewport) return;
+
+    const onDocScroll = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      viewport.scrollTop = scrollEl.scrollTop;
+      syncingRef.current = false;
+    };
+    const onRailScroll = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      scrollEl.scrollTop = viewport.scrollTop;
+      syncingRef.current = false;
+    };
+
+    scrollEl.addEventListener('scroll', onDocScroll, { passive: true });
+    viewport.addEventListener('scroll', onRailScroll, { passive: true });
     window.addEventListener('resize', scheduleReflow);
-    const ro = body ? new ResizeObserver(scheduleReflow) : null;
-    if (body) ro!.observe(body);
+    const body = scrollEl.querySelector('.op-plan-body') ?? scrollEl;
+    const ro = new ResizeObserver(scheduleReflow);
+    ro.observe(body);
     return () => {
-      scrollEl?.removeEventListener('scroll', scheduleReflow);
+      scrollEl.removeEventListener('scroll', onDocScroll);
+      viewport.removeEventListener('scroll', onRailScroll);
       window.removeEventListener('resize', scheduleReflow);
-      ro?.disconnect();
+      ro.disconnect();
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [scrollSelector, scheduleReflow]);
+  }, [getScrollEl, scheduleReflow]);
 
-  // Reflow after render whenever layout inputs change. Marks are applied by the
-  // editor on rAF, so retry a couple of frames to catch late-inserted marks.
+  // Reflow after render when layout inputs change; retry a couple of frames to
+  // catch marks the editor inserts asynchronously.
   React.useLayoutEffect(() => {
     reflow();
     const t1 = requestAnimationFrame(reflow);
@@ -112,7 +153,7 @@ export const CommentRail: React.FC<CommentRailProps> = ({
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)' }}>Comments</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', borderRadius: 999, padding: '0 7px', minWidth: 18, textAlign: 'center' }}>{total}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', borderRadius: 6, padding: '0 7px', minWidth: 18, textAlign: 'center' }}>{total}</span>
         <div style={{ flex: 1 }} />
         {onCopyMD && (
           <button onClick={onCopyMD} title="Copy as Markdown" style={{ fontSize: 12, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
@@ -124,44 +165,44 @@ export const CommentRail: React.FC<CommentRailProps> = ({
         </button>
       </div>
 
-      {/* Anchored viewport */}
-      <div ref={viewportRef} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      {/* Scrollable anchored viewport */}
+      <div ref={viewportRef} className="op-rail-viewport" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         {total === 0 ? (
           <div style={{ padding: '36px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>No comments yet</div>
             <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>Select text to add one.</div>
           </div>
         ) : (
-          annotations.map(a => {
-            const expanded = a.id === focusId || a.id === hoveredId;
-            return (
-              <div
-                key={a.id}
-                ref={el => { if (el) cardRefs.current.set(a.id, el); else cardRefs.current.delete(a.id); }}
-                onMouseEnter={() => setHoveredId(a.id)}
-                onMouseLeave={() => setHoveredId(h => (h === a.id ? null : h))}
-                style={{
-                  position: 'absolute', left: 10, right: 10, top: 0,
-                  transform: 'translateY(0px)', willChange: 'transform',
-                  zIndex: expanded ? 5 : 1,
-                  transition: 'transform 0.18s cubic-bezier(0.22,1,0.36,1)',
-                }}
-              >
-                <AnnoCard
-                  anno={a}
-                  isFocus={a.id === focusId}
-                  expanded={expanded}
-                  onClick={() => onFocus(a.id)}
-                  onEdit={onEdit}
-                  onRemove={() => onRemove(a.id)}
-                  onResolve={onResolve}
-                  onReply={onReply}
-                  onReact={onReact}
-                  onCopyLink={onCopyLink}
-                />
-              </div>
-            );
-          })
+          <div ref={innerRef} style={{ position: 'relative', width: '100%' }}>
+            {annotations.map(a => {
+              const expanded = a.id === focusId || a.id === hoveredId;
+              return (
+                <div
+                  key={a.id}
+                  ref={el => { if (el) cardRefs.current.set(a.id, el); else cardRefs.current.delete(a.id); }}
+                  onMouseEnter={() => setHoveredId(a.id)}
+                  onMouseLeave={() => setHoveredId(h => (h === a.id ? null : h))}
+                  style={{
+                    position: 'absolute', left: 10, right: 10, top: 0,
+                    zIndex: expanded ? 5 : 1,
+                  }}
+                >
+                  <AnnoCard
+                    anno={a}
+                    isFocus={a.id === focusId}
+                    expanded={expanded}
+                    onClick={() => onFocus(a.id)}
+                    onEdit={onEdit}
+                    onRemove={() => onRemove(a.id)}
+                    onResolve={onResolve}
+                    onReply={onReply}
+                    onReact={onReact}
+                    onCopyLink={onCopyLink}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

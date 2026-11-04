@@ -66,7 +66,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
   };
   const ftBtn: React.CSSProperties = {
     background: 'none', border: 'none', cursor: 'pointer', padding: 6,
-    color: 'var(--text-faint)', borderRadius: 7, display: 'inline-flex', alignItems: 'center',
+    color: 'var(--text-faint)', borderRadius: 6, display: 'inline-flex', alignItems: 'center',
     transition: 'color 0.12s, background 0.12s',
   };
   const hoverable = (el: HTMLElement, c: string) => { el.style.color = c; el.style.background = 'var(--bg-inset)'; };
@@ -96,7 +96,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
     return (
       <div onClick={onClick} style={{
         background: 'var(--bg-elevated)', border: `1px solid ${isFocus ? 'var(--border-strong)' : 'var(--border)'}`,
-        borderRadius: 12, padding: '10px 12px', cursor: 'pointer', opacity: resolved ? 0.55 : 1,
+        borderRadius: 8, padding: '10px 12px', cursor: 'pointer', opacity: resolved ? 0.55 : 1,
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -123,7 +123,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
     <div onClick={editing ? undefined : onClick} style={{
       background: 'var(--bg-elevated)',
       border: `1px solid ${isFocus ? 'var(--border-strong)' : 'var(--border)'}`,
-      borderRadius: 14, padding: 16, cursor: editing ? 'default' : 'pointer',
+      borderRadius: 8, padding: 16, cursor: editing ? 'default' : 'pointer',
       transition: 'border-color 0.15s, box-shadow 0.15s, opacity 0.15s',
       opacity: resolved ? 0.62 : 1,
       boxShadow: isFocus ? `0 6px 20px -8px rgba(0,0,0,0.35), 0 0 0 3px color-mix(in srgb, ${typeColor} 14%, transparent)` : '0 1px 3px rgba(0,0,0,0.06)',
@@ -165,10 +165,10 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
         <div style={{ marginBottom: 6 }}>
           <textarea ref={textareaRef} value={editValue} onChange={e => setEditValue(e.target.value)} onClick={e => e.stopPropagation()}
             onKeyDown={e => { if (e.key === 'Escape') setEditing(false); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSave(); } }}
-            style={{ width: '100%', minHeight: 70, resize: 'vertical', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 14, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+            style={{ width: '100%', minHeight: 70, resize: 'vertical', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', fontSize: 14, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 6, justifyContent: 'flex-end' }}>
             <button onClick={e => { e.stopPropagation(); setEditing(false); }} style={{ fontSize: 12.5, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Cancel</button>
-            <button onClick={e => { e.stopPropagation(); handleSave(); }} style={{ fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--accent)', border: 'none', borderRadius: 7, cursor: 'pointer', padding: '4px 12px' }}>Save</button>
+            <button onClick={e => { e.stopPropagation(); handleSave(); }} style={{ fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--accent)', border: 'none', borderRadius: 6, cursor: 'pointer', padding: '4px 12px' }}>Save</button>
           </div>
         </div>
       )}
@@ -178,13 +178,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
           {reactions.map(r => (
             <button key={r.emoji} onClick={e => { e.stopPropagation(); onReact?.(anno.id, r.emoji); }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: onReact ? 'pointer' : 'default', fontSize: 12.5, padding: '2px 8px', borderRadius: 999, border: `1px solid ${r.reactedByMe ? 'var(--accent)' : 'var(--border)'}`, background: r.reactedByMe ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-inset)', color: 'var(--text-secondary)' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: onReact ? 'pointer' : 'default', fontSize: 12.5, padding: '2px 8px', borderRadius: 6, border: `1px solid ${r.reactedByMe ? 'var(--accent)' : 'var(--border)'}`, background: r.reactedByMe ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-inset)', color: 'var(--text-secondary)' }}>
               <span>{r.emoji}</span><span style={{ fontSize: 11 }}>{r.count}</span>
             </button>
           ))}
           {onReact && pickReaction && QUICK_REACTIONS.filter(e => !reactions.some(r => r.emoji === e)).map(e => (
             <button key={e} onClick={ev => { ev.stopPropagation(); onReact(anno.id, e); setPickReaction(false); }}
-              style={{ fontSize: 13, padding: '2px 7px', borderRadius: 999, border: '1px dashed var(--border)', background: 'none', cursor: 'pointer' }}>{e}</button>
+              style={{ fontSize: 13, padding: '2px 7px', borderRadius: 6, border: '1px dashed var(--border)', background: 'none', cursor: 'pointer' }}>{e}</button>
           ))}
         </div>
       )}
@@ -209,10 +209,10 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
         <div style={{ marginTop: 10 }}>
           <textarea ref={replyRef} value={replyValue} onChange={e => setReplyValue(e.target.value)} placeholder="Reply…" onClick={e => e.stopPropagation()}
             onKeyDown={e => { if (e.key === 'Escape') { setReplying(false); setReplyValue(''); } if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleReply(); } }}
-            style={{ width: '100%', minHeight: 52, resize: 'vertical', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 13.5, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+            style={{ width: '100%', minHeight: 52, resize: 'vertical', background: 'var(--bg-inset)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', fontSize: 13.5, fontFamily: 'var(--font-sans)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
           <div style={{ display: 'flex', gap: 8, marginTop: 6, justifyContent: 'flex-end' }}>
             <button onClick={e => { e.stopPropagation(); setReplying(false); setReplyValue(''); }} style={{ fontSize: 12.5, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>Cancel</button>
-            <button onClick={e => { e.stopPropagation(); handleReply(); }} disabled={!replyValue.trim()} style={{ fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--accent)', border: 'none', borderRadius: 7, cursor: 'pointer', padding: '4px 12px', opacity: replyValue.trim() ? 1 : 0.5 }}>Reply</button>
+            <button onClick={e => { e.stopPropagation(); handleReply(); }} disabled={!replyValue.trim()} style={{ fontSize: 12.5, fontWeight: 600, color: '#fff', background: 'var(--accent)', border: 'none', borderRadius: 6, cursor: 'pointer', padding: '4px 12px', opacity: replyValue.trim() ? 1 : 0.5 }}>Reply</button>
           </div>
         </div>
       )}
