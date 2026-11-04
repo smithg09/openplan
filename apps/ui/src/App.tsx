@@ -14,7 +14,7 @@ import { RequestChangesFlyup } from './components/RequestChangesFlyup';
 import { ToastStack } from './components/Primitives';
 import { PlanEditor } from '@openplan/plan-viewer';
 import { UpdateBanner } from './components/UpdateBanner';
-import { AnnotationsPanel } from '@openplan/annotations';
+import { CommentRail } from '@openplan/annotations';
 import type { Annotation } from '@openplan/shared';
 import { getAuthor, setAuthor } from './lib/identity';
 import { isShareMode } from './lib/mode';
@@ -26,7 +26,7 @@ export default function App() {
     approveFlow, toasts, slug, title, version, initialized, loading, selectedFile, dirFiles,
     fileAnnotationCounts,
     setTheme,
-    addAnnotation, removeAnnotation, updateAnnotation, resolveAnnotation, setFocusedAnnotation, setPanelOpen,
+    addAnnotation, removeAnnotation, updateAnnotation, resolveAnnotation, replyToAnnotation, toggleReaction, setFocusedAnnotation, setPanelOpen,
     startApprove, startSend, tickCountdown, resetApprove,
     pushToast, dismissToast,
     initializeFromAPI, setLoading, setSelectedFile, setPlanContent, hasEdits,
@@ -495,13 +495,22 @@ export default function App() {
         )}
 
         {panelOpen && (
-          <AnnotationsPanel
+          <CommentRail
             annotations={annotations}
             focusId={focusedAnnotationId}
             onFocus={setFocusedAnnotation}
             onEdit={updateAnnotation}
             onRemove={removeAnnotation}
             onResolve={resolveAnnotation}
+            onReply={(id, body) => replyToAnnotation(id, body, author || 'anonymous')}
+            onReact={(id, emoji) => toggleReaction(id, emoji, author || 'anonymous')}
+            onCopyLink={(id) => {
+              const url = `${location.origin}${location.pathname}#anno-${id}`;
+              navigator.clipboard.writeText(url).then(
+                () => pushToast('Link copied'),
+                () => pushToast('Failed to copy link'),
+              );
+            }}
             onClose={() => setPanelOpen(false)}
             onCopyMD={() => {
               const md = exportAnnotationsToMarkdown(annotations, plan);

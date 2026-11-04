@@ -62,6 +62,8 @@ interface AppState {
   addAnnotation: (ann: Omit<Annotation, 'id' | 'createdAt' | 'resolved'>) => void;
   resolveAnnotation: (id: string) => void;
   removeAnnotation: (id: string) => void;
+  replyToAnnotation: (id: string, body: string, author: string) => void;
+  toggleReaction: (id: string, emoji: string, author: string) => void;
   updateAnnotation: (id: string, body: string) => void;
   setFocusedAnnotation: (id: string | null) => void;
   setPanelOpen: (open: boolean) => void;
@@ -218,7 +220,41 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateAnnotation: (id, body) => {
     set(s => ({
-      annotations: s.annotations.map(a => a.id === id ? { ...a, body } : a),
+      annotations: s.annotations.map(a => a.id === id ? { ...a, body, edited: true } : a),
+    }));
+  },
+
+  replyToAnnotation: (id, body, author) => {
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    set(s => ({
+      annotations: s.annotations.map(a => a.id === id ? {
+        ...a,
+        replies: [
+          ...(a.replies ?? []),
+          { id: 'rep_' + Math.random().toString(36).slice(2, 8), body: trimmed, author, createdAt: new Date().toISOString() },
+        ],
+      } : a),
+    }));
+  },
+
+  toggleReaction: (id, emoji, author) => {
+    set(s => ({
+      annotations: s.annotations.map(a => {
+        if (a.id !== id) return a;
+        const reactions = [...(a.reactions ?? [])];
+        const idx = reactions.findIndex(r => r.emoji === emoji);
+        if (idx === -1) {
+          reactions.push({ emoji, count: 1, reactedByMe: true, reactors: [author] });
+        } else {
+          const r = reactions[idx];
+          const has = (r.reactors ?? []).includes(author);
+          const reactors = has ? (r.reactors ?? []).filter(x => x !== author) : [...(r.reactors ?? []), author];
+          if (reactors.length === 0) reactions.splice(idx, 1);
+          else reactions[idx] = { ...r, reactors, count: reactors.length, reactedByMe: reactors.includes(author) };
+        }
+        return { ...a, reactions };
+      }),
     }));
   },
 
