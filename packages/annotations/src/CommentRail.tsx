@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
-import { X } from 'lucide-react';
 import { AnnoCard } from './AnnoCard';
+import { Icon } from './icons';
 
 interface CommentRailProps {
   annotations: Annotation[];
@@ -40,7 +40,23 @@ export const CommentRail: React.FC<CommentRailProps> = ({
   const cardRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
   const rafRef = React.useRef<number | null>(null);
   const syncingRef = React.useRef(false);
+  // Gate position transitions: off during the initial mount settle (so cards
+  // don't visibly fly in), on afterwards so hover/expand reflows glide.
+  const animateRef = React.useRef(false);
+  const hoverTimerRef = React.useRef<number | null>(null);
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+
+  // Small hover-intent delay: expanding a card reflows its neighbours, which can
+  // slide another card under the cursor and bounce the hover between them.
+  const handleEnter = React.useCallback((id: string) => {
+    if (hoverTimerRef.current != null) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = window.setTimeout(() => setHoveredId(id), 70);
+  }, []);
+  const handleLeave = React.useCallback((id: string) => {
+    if (hoverTimerRef.current != null) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    setHoveredId(h => (h === id ? null : h));
+  }, []);
+  React.useEffect(() => () => { if (hoverTimerRef.current != null) clearTimeout(hoverTimerRef.current); }, []);
 
   const getScrollEl = React.useCallback(
     () => document.querySelector(scrollSelector) as HTMLElement | null,
@@ -83,7 +99,16 @@ export const CommentRail: React.FC<CommentRailProps> = ({
       it.top = top;
       cursor = top + it.h;
     }
-    for (const it of items) it.el.style.top = `${Math.round(it.top)}px`;
+    const ease = 'top 0.18s cubic-bezier(0.22, 0.61, 0.36, 1)';
+    for (const it of items) {
+      // Animate only cards already placed once; a card's first placement (on
+      // mount, or when added/late-anchored later) jumps straight to position so
+      // nothing flies in from the top.
+      const firstPlace = !it.el.dataset.placed;
+      it.el.style.transition = (animateRef.current && !firstPlace) ? ease : 'none';
+      it.el.style.top = `${Math.round(it.top)}px`;
+      it.el.dataset.placed = '1';
+    }
 
     // Grow the track if stacked cards extend past the document height.
     if (cursor !== -Infinity && cursor + PAD_BOTTOM > scrollEl.scrollHeight) {
@@ -128,11 +153,14 @@ export const CommentRail: React.FC<CommentRailProps> = ({
     const body = scrollEl.querySelector('.op-plan-body') ?? scrollEl;
     const ro = new ResizeObserver(scheduleReflow);
     ro.observe(body);
+    // Enable glide only after the initial placement has settled.
+    const animTimer = window.setTimeout(() => { animateRef.current = true; }, 420);
     return () => {
       scrollEl.removeEventListener('scroll', onDocScroll);
       viewport.removeEventListener('scroll', onRailScroll);
       window.removeEventListener('resize', scheduleReflow);
       ro.disconnect();
+      clearTimeout(animTimer);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, [getScrollEl, scheduleReflow]);
@@ -161,7 +189,7 @@ export const CommentRail: React.FC<CommentRailProps> = ({
         )}
         <button onClick={onClose} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-faint)', borderRadius: 6, display: 'inline-flex' }}
           onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
-          <X size={14} strokeWidth={1.7} />
+          <Icon name="close" size={16} />
         </button>
       </div>
 
@@ -180,8 +208,8 @@ export const CommentRail: React.FC<CommentRailProps> = ({
                 <div
                   key={a.id}
                   ref={el => { if (el) cardRefs.current.set(a.id, el); else cardRefs.current.delete(a.id); }}
-                  onMouseEnter={() => setHoveredId(a.id)}
-                  onMouseLeave={() => setHoveredId(h => (h === a.id ? null : h))}
+                  onMouseEnter={() => handleEnter(a.id)}
+                  onMouseLeave={() => handleLeave(a.id)}
                   style={{
                     position: 'absolute', left: 10, right: 10, top: 0,
                     zIndex: expanded ? 5 : 1,

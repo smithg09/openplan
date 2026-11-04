@@ -4,9 +4,11 @@ import { slugify } from '@openplan/plan-viewer';
 import { IS_GITHUB_PAGES } from '../lib/mode';
 import { useStore } from '../store';
 
-const OutlineIcon = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"><path d="M2.5 3h7M2.5 6h5M2.5 9h6" /></svg>;
-const FolderIcon = () => <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M1.5 3.5h3l1 1h5v5.5h-9z" /></svg>;
-const FileIcon = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M3 1.5h4.5L9.5 3.5v7h-6.5z" /><path d="M7.5 1.5v2h2" /></svg>;
+import { Icon } from '@openplan/annotations';
+
+const OutlineIcon = () => <Icon name="format_list_bulleted" size={14} />;
+const FolderIcon = () => <Icon name="folder" size={14} fill />;
+const FileIcon = () => <Icon name="description" size={13} />;
 
 interface OutlineItem {
   level: 1 | 2 | 3;

@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
-import { SmilePlus, Reply, Link2, Pencil, Trash2, CircleCheck } from 'lucide-react';
-import { AnnoIcon, ANNOTATION_TYPES } from './icons';
+import { AnnoIcon, Icon, ANNOTATION_TYPES } from './icons';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function formatAdded(iso: string): string {
@@ -125,6 +124,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
       border: `1px solid ${isFocus ? 'var(--border-strong)' : 'var(--border)'}`,
       borderRadius: 8, padding: 16, cursor: editing ? 'default' : 'pointer',
       transition: 'border-color 0.15s, box-shadow 0.15s, opacity 0.15s',
+      animation: 'op-anno-pop 0.16s ease',
       opacity: resolved ? 0.62 : 1,
       boxShadow: isFocus ? `0 6px 20px -8px rgba(0,0,0,0.35), 0 0 0 3px color-mix(in srgb, ${typeColor} 14%, transparent)` : '0 1px 3px rgba(0,0,0,0.06)',
     }}>
@@ -222,36 +222,36 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
         {onReact && (
           <button title="React" style={ftBtn} onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <SmilePlus size={17} strokeWidth={1.7} />
+            <Icon name="add_reaction" size={18} />
           </button>
         )}
         <div style={{ flex: 1 }} />
         {onReply && (
           <button title="Reply" style={ftBtn} onClick={e => { e.stopPropagation(); setReplying(v => !v); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <Reply size={17} strokeWidth={1.7} />
+            <Icon name="reply" size={18} />
           </button>
         )}
         {onCopyLink && (
           <button title="Copy link" style={ftBtn} onClick={e => { e.stopPropagation(); onCopyLink(anno.id); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <Link2 size={17} strokeWidth={1.7} />
+            <Icon name="link" size={18} />
           </button>
         )}
         {anno.type !== 'emoji' && anno.type !== 'deletion' && (
           <button title="Edit" style={ftBtn} onClick={e => { e.stopPropagation(); setEditing(true); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <Pencil size={16} strokeWidth={1.7} />
+            <Icon name="edit" size={17} />
           </button>
         )}
         <button title="Remove" style={ftBtn} onClick={e => { e.stopPropagation(); onRemove(); }}
           onMouseEnter={e => hoverable(e.currentTarget, 'var(--danger)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-          <Trash2 size={16} strokeWidth={1.7} />
+          <Icon name="delete" size={17} />
         </button>
         {onResolve && (
           <button title={resolved ? 'Reopen' : 'Resolve'} style={{ ...ftBtn, color: resolved ? 'var(--teal)' : 'var(--text-faint)' }} onClick={e => { e.stopPropagation(); onResolve(anno.id); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--teal)')} onMouseLeave={e => unhover(e.currentTarget, resolved ? 'var(--teal)' : 'var(--text-faint)')}>
-            <CircleCheck size={18} strokeWidth={1.7} />
+            <Icon name="check_circle" size={19} fill={resolved} />
           </button>
         )}
       </div>

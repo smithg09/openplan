@@ -1,8 +1,7 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
-import { X } from 'lucide-react';
 import { AnnoCard } from './AnnoCard';
-import { AnnoIcon } from './icons';
+import { AnnoIcon, Icon } from './icons';
 
 const TABS = [
   { id: 'all',       label: 'All' },
@@ -70,7 +69,7 @@ export const AnnotationsPanel: React.FC<AnnotationsPanelProps> = ({
           onMouseEnter={e => { (e.currentTarget).style.color = 'var(--text-secondary)'; }}
           onMouseLeave={e => { (e.currentTarget).style.color = 'var(--text-faint)'; }}
         >
-          <X size={12} strokeWidth={1.6} />
+          <Icon name="close" size={14} />
         </button>
       </div>
 

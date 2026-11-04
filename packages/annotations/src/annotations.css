@@ -89,6 +89,15 @@
 .op-anno-card-suggestion .from { color: var(--danger); text-decoration: line-through; }
 .op-anno-card-suggestion .to { color: var(--success); }
 
+/* Expanded card reveal — smooths the compact→expanded swap on hover/focus. */
+@keyframes op-anno-pop {
+  from { opacity: 0.5; transform: translateY(-3px) scale(0.985); }
+  to   { opacity: 1;   transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes op-anno-pop { from { opacity: 1; } to { opacity: 1; } }
+}
+
 /* === Light mode overrides === */
 [data-theme="light"] .op-anno-card {
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
