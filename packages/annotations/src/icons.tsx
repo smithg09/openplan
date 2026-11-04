@@ -66,7 +66,7 @@ const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
   warning: Alert02Icon,
 };
 
-const SCALE = 1.18;
+const SCALE = 1.05;
 
 interface IconProps {
   name: string;

@@ -27,7 +27,7 @@ const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
   check_box:       CheckmarkSquare01Icon,
 };
 
-const SCALE = 1.18;
+const SCALE = 1.05;
 
 interface IconProps {
   name: string;
