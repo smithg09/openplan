@@ -11,6 +11,7 @@ openplan (root)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
 │   ├── opendocs-ui/      → React + Vite host UI for the `opendocs` binary (plain CSS + tokens, no Tailwind)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
+│   ├── opendocs-landing/ → React + Vite marketing site for opendocs (vanilla CSS; deploys to Cloudflare Pages)
 │   ├── plugin/           → Claude Code plugin (hooks + slash commands)
 │   ├── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json + commands/)
 │   ├── plugin-codex/     → Codex CLI hook config (hooks.json only — skills ship via `openplan install codex`, not this folder)
@@ -45,6 +46,7 @@ openplan (root)
 bun install                  # Install all workspace dependencies
 bun run build:ui             # Build main UI → apps/cli/internal/server/ui/dist/
 bun run build:landing        # Build landing page → apps/landing-page/dist/
+bun run build:opendocs-landing # Build opendocs marketing site → apps/opendocs-landing/dist/ (public/open/ = deep-link page)
 bun run build:cli            # Build Go binary → bin/openplan
 bun run build                # Build UI + CLI (UI first, then CLI)
 bun run build:opendocs-ui    # Build opendocs host UI → apps/cli/internal/opendocs/server/ui/dist/
@@ -261,13 +263,25 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   own URL, so `GET .../versions/{id}/frame-url` (viewer+) returns an HMAC-signed, 5-minute, doc+version-scoped
   `?sig=`. `/frame` in proxy mode accepts only that. Share links carry the token in the URL **fragment**
   (`/d/<id>#t=<token>`); the UI moves it to `sessionStorage` and strips it from the address bar.
-- **Storage:** `--store sqlite` (default; `internal/opendocs/sqlstore`, pure-Go `modernc.org/sqlite`) or `fs`.
-  Both pass `store/storetest` (the shared contract suite). **sqlstore is imported only by the proxy**
-  (check: `go list -deps ./cmd/opendocs | grep -c modernc` must be 0). modernc is pinned to v1.44.0 because
-  newer releases force `go 1.26` in go.mod. State lives in `--data` (`opendocs.db`, `grants.json`,
-  `signing.key`, all 0600/0700). Single process owns it.
-- Not done yet: Postgres (PR 4), rate limits / size quotas for the public hosted instance (PR 4), TLS (put a
-  reverse proxy in front), folders/labels/search.
+- **Storage:** `--store sqlite` (default), `postgres` (`--database-url` / `$DATABASE_URL`) or `fs`.
+  `internal/opendocs/sqlstore` is one dialect-aware implementation for SQLite (pure-Go `modernc.org/sqlite`,
+  pinned v1.44.0 because newer releases force `go 1.26`) and Postgres (`pgx` stdlib); all backends pass
+  `store/storetest` (Postgres gated on `OPENDOCS_TEST_PG_DSN`; CI runs it against a postgres:16 service).
+  **Drivers are imported only by the proxy** (check: `go list -deps ./cmd/opendocs . | grep -cE 'modernc|pgx'`
+  must be 0). For sqlite/postgres, **capability grants live in the DB too** (`sqlstore.Grants()`), so an
+  ephemeral-disk host keeps share links across deploys; `fs` uses `grants.json`. Signing key: `$OPENDOCS_SIGNING_KEY`
+  or `--data/signing.key`.
+- **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
+  writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
+  X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
+- **Hosted deploy:** `Dockerfile.opendocs-proxy` + `render.yaml` (Render web service + Postgres; not yet
+  deployed — needs the user's Render account). `apps/opendocs-landing/` (React+Vite, vanilla CSS, own sapphire `tokens.css`) is the marketing site for Cloudflare Pages
+  (`.github/workflows/opendocs-site.yml`, needs `CLOUDFLARE_*` secrets and repo var `OPENDOCS_SITE_ENABLED=true`)
+  including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
+  destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
+  Render's free Postgres expires after ~30 days — use a paid/Neon/Supabase DB for anything lasting.
+- Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search,
+  the proxy-URL settings + local→hosted resolution chain in the CLI.
 
 **Rendering finding (verified):** Claude's preview pane blocks the *network request* of a sandboxed
 (opaque-origin) iframe with `net::ERR_BLOCKED_BY_CLIENT`; same URL in a non-sandboxed or
@@ -315,6 +329,8 @@ binary, same as openplan.
 | `src/components/` | Hero, Nav, FeaturesSection, DemoSection, PageAnnotator, etc. |
 | `src/tokens.css` | Design tokens (separate from main UI) |
 | `src/icons.tsx` | SVG icon components |
+
+Both marketing navs render `SiteSwitcher` from `@openplan/shared` (`packages/shared/src/SiteSwitcher.tsx`): a hover/focus/click dropdown on the product name that links openplan ⇄ opendocs. Add a product to `SITES` there and both navs pick it up.
 
 ### Plugin (`apps/plugin/`)
 

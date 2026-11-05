@@ -304,3 +304,85 @@ func TestProxySessionAdvertisesMode(t *testing.T) {
 		t.Errorf("mode = %v", got["mode"])
 	}
 }
+
+func TestProxyRateLimitsAndQuotas(t *testing.T) {
+	key, _ := auth.NewRandomKey()
+	signer, _ := auth.NewSigner(key)
+	grants := auth.NewFileGrants(filepath.Join(t.TempDir(), "g.json"))
+	srv := NewProxy(store.NewWithBase(t.TempDir()).Backend(), grants, signer, "t").
+		WithLimits(Limits{CreatePerHour: 2, WritePerMin: 1000, MaxVersions: 2, MaxComments: 2, MaxCommentLen: 5})
+	e := &proxyEnv{t: t, h: srv.Handler(), signer: signer}
+
+	// Creating docs is rate-limited per client; reads are not.
+	codes := []int{}
+	var id, tok string
+	for range 3 {
+		w := e.call("", "POST", "/api/docs", map[string]string{"html": "x"})
+		codes = append(codes, w.Code)
+		if w.Code == 200 && id == "" {
+			c := decode[struct{ ID, EditorToken string }](t, w)
+			id = c.ID
+			tok = decode[map[string]any](t, w)["editorToken"].(string)
+		}
+	}
+	if codes[0] != 200 || codes[1] != 200 || codes[2] != 429 {
+		t.Fatalf("create codes = %v, want [200 200 429]", codes)
+	}
+	if w := e.call("", "POST", "/api/docs", map[string]string{}); w.Header().Get("Retry-After") == "" {
+		t.Error("429 should carry Retry-After")
+	}
+	if got := e.call(tok, "GET", "/api/docs/"+id+"/versions", nil).Code; got != 200 {
+		t.Errorf("reads must not be limited, got %d", got)
+	}
+
+	base := "/api/docs/" + id
+	if got := e.call(tok, "POST", base+"/versions", createVersionReq{HTML: "two"}).Code; got != 200 {
+		t.Fatalf("second version = %d", got)
+	}
+	if got := e.call(tok, "POST", base+"/versions", createVersionReq{HTML: "three"}).Code; got != 413 {
+		t.Errorf("over version quota = %d, want 413", got)
+	}
+	if got := e.call(tok, "POST", base+"/comments", map[string]any{"body": "way too long"}).Code; got != 413 {
+		t.Errorf("over comment length = %d, want 413", got)
+	}
+	e.call(tok, "POST", base+"/comments", map[string]any{"body": "a"})
+	e.call(tok, "POST", base+"/comments", map[string]any{"body": "b"})
+	if got := e.call(tok, "POST", base+"/comments", map[string]any{"body": "c"}).Code; got != 413 {
+		t.Errorf("over comment count = %d, want 413", got)
+	}
+}
+
+func TestRateLimiterRefill(t *testing.T) {
+	rl := newRateLimiter(2, time.Minute)
+	now := time.Unix(0, 0)
+	rl.now = func() time.Time { return now }
+	for range 2 {
+		if _, ok := rl.allow("a"); !ok {
+			t.Fatal("burst should pass")
+		}
+	}
+	if _, ok := rl.allow("a"); ok {
+		t.Fatal("third should be refused")
+	}
+	if _, ok := rl.allow("b"); !ok {
+		t.Error("buckets are per key")
+	}
+	now = now.Add(31 * time.Second)
+	if _, ok := rl.allow("a"); !ok {
+		t.Error("a token should have refilled after half the window")
+	}
+}
+
+func TestClientIPTrustProxy(t *testing.T) {
+	s := &Server{}
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "10.0.0.1:5555"
+	r.Header.Set("X-Forwarded-For", "6.6.6.6, 9.9.9.9")
+	if got := s.clientIP(r); got != "10.0.0.1" {
+		t.Errorf("untrusted XFF must be ignored, got %s", got)
+	}
+	s.limits.TrustProxy = true
+	if got := s.clientIP(r); got != "9.9.9.9" {
+		t.Errorf("trusted proxy: want last hop 9.9.9.9 (not client-forged), got %s", got)
+	}
+}

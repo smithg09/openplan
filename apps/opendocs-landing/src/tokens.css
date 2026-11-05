@@ -1,0 +1,40 @@
+/* opendocs design tokens — sapphire accent (openplan's landing uses blue; this is a deeper, bluer sibling) */
+:root {
+  --bg-base: #0c0e14;
+  --bg-surface: #141720;
+  --bg-elevated: #1a1e2a;
+  --bg-subtle: #232837;
+  --bg-inset: #0a0c11;
+  --border: #2a3042;
+  --border-strong: #46506a;
+  --text-primary: #f4f6fb;
+  --text-secondary: #a6aec4;
+  --text-muted: #747d96;
+  --text-faint: #505870;
+
+  --accent: #3b6cf6;
+  --accent-hover: #2f58d4;
+  --accent-fg: #8fb0ff;
+  --accent-subtle: #121d3f;
+  --mark: #fbbf2433;
+  --mark-line: #fbbf24;
+  --success: #34d399;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+[data-theme="light"] {
+  --bg-base: #f5f7fb;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #eaeef7;
+  --bg-inset: #eef1f8;
+  --border: #d9deec;
+  --border-strong: #b3bbd2;
+  --text-primary: #12162a;
+  --text-secondary: #474f6b;
+  --text-muted: #6b7390;
+  --text-faint: #9aa1b8;
+  --accent-fg: var(--accent);
+  --accent-subtle: #e8eeff;
+}

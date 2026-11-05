@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Open an opendocs link</title>
+<style>body{font:16px/1.6 system-ui,sans-serif;max-width:36rem;margin:4rem auto;padding:0 1rem;color:#1a1a1a}
+code{background:#eef;padding:1px 5px;border-radius:4px;word-break:break-all}
+a.btn{display:inline-block;margin-top:1rem;padding:.6rem 1.1rem;background:#2457d6;color:#fff;border-radius:8px;text-decoration:none}</style></head>
+<body><h1>Open a shared document</h1><div id="out">Checking link…</div>
+<script>
+// Link shape:  /open/#proxy=<https url>&doc=<id>&t=<token>
+// Everything is in the URL *fragment*, so the token is never sent to any server.
+// We never redirect automatically: the visitor sees the destination host first,
+// so this page cannot be used as an open redirect.
+(function () {
+  var out = document.getElementById('out');
+  var p = new URLSearchParams(location.hash.slice(1));
+  var proxy = p.get('proxy') || '', doc = p.get('doc') || '', t = p.get('t') || '';
+  var url;
+  try { url = new URL(proxy); } catch (e) { return fail('Missing or invalid proxy URL.'); }
+  var local = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  if (url.protocol !== 'https:' && !(local && url.protocol === 'http:')) return fail('The proxy must be https.');
+  if (url.username || url.password) return fail('Credentials in the proxy URL are not allowed.');
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(doc)) return fail('Missing or invalid document id.');
+  if (t && !/^[A-Za-z0-9_-]{16,128}$/.test(t)) return fail('Invalid access token.');
+  var dest = url.origin + '/d/' + encodeURIComponent(doc) + (t ? '#t=' + encodeURIComponent(t) : '');
+  out.textContent = '';
+  var msg = document.createElement('p');
+  msg.append('This link opens a document hosted on ');
+  var code = document.createElement('code'); code.textContent = url.host; msg.append(code, '.');
+  var a = document.createElement('a'); a.className = 'btn'; a.href = dest; a.rel = 'noreferrer noopener';
+  a.textContent = 'Open document';
+  out.append(msg, a);
+  // Drop the token from this page's address bar and history.
+  history.replaceState(null, '', location.pathname);
+  function fail(m) { out.textContent = m; }
+})();
+</script></body></html>

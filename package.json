@@ -28,6 +28,8 @@
     "dev:landing": "bun run --cwd apps/landing-page dev",
     "dev:opendocs-ui": "bun run --cwd apps/opendocs-ui dev",
     "build:ui": "bun run --cwd apps/ui build",
+    "build:opendocs-landing": "bun run --cwd apps/opendocs-landing build",
+    "dev:opendocs-landing": "bun run --cwd apps/opendocs-landing dev",
     "build:landing": "bun run --cwd apps/landing-page build",
     "build:opendocs-ui": "rm -rf apps/cli/internal/opendocs/server/ui/dist/assets && bun run --cwd apps/opendocs-ui build",
     "build:cli": "cd apps/cli && go build -o ../../bin/openplan .",

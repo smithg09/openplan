@@ -1,0 +1,22 @@
+# Render blueprint for the hosted opendocs-proxy (Postgres-backed).
+# Render > New > Blueprint > pick this repo. The app and database are created together.
+services:
+  - type: web
+    name: opendocs-proxy
+    runtime: docker
+    dockerfilePath: ./Dockerfile.opendocs-proxy
+    healthCheckPath: /healthz
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: opendocs-db
+          property: connectionString
+      - key: OPENDOCS_SIGNING_KEY
+        generateValue: true
+    # Render terminates TLS and appends the real client IP as the last X-Forwarded-For hop.
+    dockerCommand: opendocs-proxy --store postgres --trust-proxy
+
+databases:
+  - name: opendocs-db
+    plan: free
