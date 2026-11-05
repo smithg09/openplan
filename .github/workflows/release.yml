@@ -73,9 +73,19 @@ jobs:
 
             tar -czf "opendocs_${GOOS}_${GOARCH}.tar.gz" opendocs
             rm opendocs
+
+            echo "Building opendocs-proxy for ${GOOS}/${GOARCH}..."
+            cd apps/cli
+            CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o ../../opendocs-proxy ./cmd/opendocs-proxy
+            cd ../..
+
+            tar -czf "opendocs-proxy_${GOOS}_${GOARCH}.tar.gz" opendocs-proxy
+            rm opendocs-proxy
           done
 
-          ls -lh openplan_*.tar.gz opendocs_*.tar.gz
+          ls -lh openplan_*.tar.gz opendocs_*.tar.gz opendocs-proxy_*.tar.gz
 
       - name: Extract changelog entry
         id: changelog
@@ -92,5 +102,6 @@ jobs:
           files: |
             openplan_*.tar.gz
             opendocs_*.tar.gz
+            opendocs-proxy_*.tar.gz
           body: ${{ steps.changelog.outputs.body }}
           prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
