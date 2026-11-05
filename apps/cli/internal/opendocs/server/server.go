@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
 	"github.com/smithg09/openplan/cli/internal/opendocs/render"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
@@ -35,6 +36,10 @@ type Server struct {
 	project string
 	focus   string // document slug to open first (for `opendocs open`), optional
 	version string
+
+	// Proxy mode (nil/unset for the local server): see access.go.
+	grants auth.Grants
+	signer *auth.Signer
 
 	httpSrv *http.Server
 
@@ -59,17 +64,28 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/session", s.handleSession)
-	mux.HandleFunc("POST /api/session/done", s.handleDone)
-	mux.HandleFunc("GET /api/docs", s.handleListDocs)
-	mux.HandleFunc("GET /api/docs/{doc}/versions", s.handleListVersions)
-	mux.HandleFunc("POST /api/docs/{doc}/versions", s.handleCreateVersion)
+	if s.multiTenant() {
+		// Opaque server-minted ids; no listing of other people's documents.
+		mux.HandleFunc("POST /api/docs", s.handleCreateDoc)
+		mux.HandleFunc("GET /api/docs/{doc}/shares", s.guard(auth.ActWrite, s.handleListShares))
+		mux.HandleFunc("POST /api/docs/{doc}/shares", s.guard(auth.ActWrite, s.handleMintShare))
+		mux.HandleFunc("DELETE /api/docs/{doc}/shares/{id}", s.guard(auth.ActWrite, s.handleRevokeShare))
+	} else {
+		mux.HandleFunc("POST /api/session/done", s.handleDone)
+		mux.HandleFunc("GET /api/docs", s.handleListDocs)
+	}
+	mux.HandleFunc("GET /api/docs/{doc}/access", s.guard(auth.ActRead, s.handleAccess))
+	mux.HandleFunc("GET /api/docs/{doc}/versions", s.guard(auth.ActRead, s.handleListVersions))
+	mux.HandleFunc("POST /api/docs/{doc}/versions", s.guard(auth.ActWrite, s.handleCreateVersion))
+	mux.HandleFunc("GET /api/docs/{doc}/versions/{id}/frame-url", s.guard(auth.ActRead, s.handleFrameURL))
+	// The frame is authorised by a signed URL, not a bearer token (see handleFrame).
 	mux.HandleFunc("GET /api/docs/{doc}/versions/{id}/frame", s.handleFrame)
-	mux.HandleFunc("GET /api/docs/{doc}/comments", s.handleListComments)
-	mux.HandleFunc("POST /api/docs/{doc}/comments", s.handleAddComment)
-	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/status", s.handleCommentStatus)
-	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/edit", s.handleEditComment)
-	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/react", s.handleReactComment)
-	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.handleDeleteComment)
+	mux.HandleFunc("GET /api/docs/{doc}/comments", s.guard(auth.ActRead, s.handleListComments))
+	mux.HandleFunc("POST /api/docs/{doc}/comments", s.guard(auth.ActComment, s.handleAddComment))
+	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/status", s.guard(auth.ActComment, s.handleCommentStatus))
+	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/edit", s.guard(auth.ActModifyOwn, s.handleEditComment))
+	mux.HandleFunc("POST /api/docs/{doc}/comments/{id}/react", s.guard(auth.ActComment, s.handleReactComment))
+	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.guard(auth.ActModifyOwn, s.handleDeleteComment))
 
 	mux.Handle("/", s.uiHandler())
 	return guardWrites(mux)
@@ -151,6 +167,7 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		"project": s.project,
 		"focus":   s.focus,
 		"version": s.version,
+		"mode":    map[bool]string{true: "proxy", false: "local"}[s.multiTenant()],
 	})
 }
 
@@ -169,7 +186,7 @@ func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"docs": docs})
 }
 
-func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request, _ principal) {
 	versions, err := s.doc(r).ListVersions()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
@@ -185,7 +202,7 @@ type createVersionReq struct {
 	Summary      string `json:"summary"`
 }
 
-func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request, _ principal) {
 	var req createVersionReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
@@ -207,6 +224,10 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) {
 // is meant to be loaded into a sandboxed iframe; it must never carry the host's
 // credentials, which the sandbox (no allow-same-origin) already guarantees.
 func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
+	if !s.frameAllowed(r) {
+		http.Error(w, "missing, invalid or expired frame signature", http.StatusUnauthorized)
+		return
+	}
 	// Only serve this into an <iframe>. Opened directly (a top-level navigation),
 	// the agent's HTML would run same-origin with the API and could read/write
 	// comments. Browsers set Sec-Fetch-Dest and pages cannot forge it; non-browser
@@ -237,24 +258,27 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 	// never isolated and this is NOT verified in stock Chromium. If it is, adding
 	// the header back would be belt-and-braces.
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	_, _ = w.Write(render.Frame(content))
 }
 
-func (s *Server) handleListComments(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListComments(w http.ResponseWriter, r *http.Request, p principal) {
 	comments, err := s.doc(r).ListComments()
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"comments": comments})
+	writeJSON(w, http.StatusOK, map[string]any{"comments": toPublic(comments, p)})
 }
 
-func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request, p principal) {
 	var c store.Comment
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	c.Owner = p.hash // never trust a client-supplied owner
 	saved, err := s.doc(r).AddComment(c)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusBadRequest, err)
@@ -264,14 +288,14 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, saved)
+	writeJSON(w, http.StatusOK, toPublic([]store.Comment{saved}, p)[0])
 }
 
 type statusReq struct {
 	Status string `json:"status"`
 }
 
-func (s *Server) handleCommentStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCommentStatus(w http.ResponseWriter, r *http.Request, _ principal) {
 	var req statusReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
@@ -293,10 +317,14 @@ type editReq struct {
 	Body string `json:"body"`
 }
 
-func (s *Server) handleEditComment(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleEditComment(w http.ResponseWriter, r *http.Request, p principal) {
 	var req editReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	// Editing rewrites someone's words: only the author may, whatever their role.
+	if !s.requireOwner(w, s.doc(r), r.PathValue("id"), p, false) {
 		return
 	}
 	err := s.doc(r).EditComment(r.PathValue("id"), req.Body)
@@ -316,7 +344,7 @@ type reactReq struct {
 	User  string `json:"user"`
 }
 
-func (s *Server) handleReactComment(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReactComment(w http.ResponseWriter, r *http.Request, _ principal) {
 	var req reactReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, err)
@@ -334,7 +362,11 @@ func (s *Server) handleReactComment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request, p principal) {
+	// Authors may delete their own; editors may delete anyone's.
+	if !s.requireOwner(w, s.doc(r), r.PathValue("id"), p, p.role.Can(auth.ActWrite)) {
+		return
+	}
 	err := s.doc(r).DeleteComment(r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusNotFound, err)

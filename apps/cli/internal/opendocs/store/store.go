@@ -71,10 +71,13 @@ type Reaction struct {
 // Comment is a doc-scoped comment. Replies point at a root via RootCommentID;
 // a root comment carries the Anchor and an empty RootCommentID.
 type Comment struct {
-	ID                 string     `json:"id"`
-	Anchor             *Anchor    `json:"anchor,omitempty"`
-	Body               string     `json:"body"`
-	Author             string     `json:"author,omitempty"`
+	ID     string  `json:"id"`
+	Anchor *Anchor `json:"anchor,omitempty"`
+	Body   string  `json:"body"`
+	Author string  `json:"author,omitempty"`
+	// Owner is the hash of the capability token that wrote the comment (proxy
+	// mode only). It gates edit/delete rights and is never sent to clients.
+	Owner              string     `json:"owner,omitempty"`
 	CreatedOnVersionID string     `json:"createdOnVersionId"`
 	RootCommentID      string     `json:"rootCommentId,omitempty"`
 	Status             string     `json:"status"` // "open" or "resolved"
