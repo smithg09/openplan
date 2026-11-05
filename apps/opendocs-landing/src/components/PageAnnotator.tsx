@@ -233,18 +233,6 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
         resolved: false,
       },
       {
-        id: 'page_predefined_2',
-        type: 'suggestion',
-        selectedText: 'draft',
-        from: 0,
-        to: 0,
-        suggestion: 'write',
-        body: 'These are finished docs, not drafts.',
-        author: 'Tomasz Brandt',
-        createdAt: now,
-        resolved: false,
-      },
-      {
         id: 'page_predefined_3',
         type: 'question',
         selectedText: 'Antigravity CLI',
