@@ -363,3 +363,13 @@ func TestCommentTypeRoundTrips(t *testing.T) {
 		t.Fatalf("type/suggestion lost: %d %s", w.Code, w.Body)
 	}
 }
+
+func TestSampleEndpoint(t *testing.T) {
+	s, _ := newTestServer(t)
+	w := do(t, s.Handler(), "GET", "/api/sample", nil)
+	var out struct{ Slug, HTML string }
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if w.Code != 200 || out.Slug != "retry-storm" || !strings.Contains(out.HTML, "<title>How a retry storm took down checkout</title>") {
+		t.Fatalf("sample = %d %.80s", w.Code, w.Body)
+	}
+}

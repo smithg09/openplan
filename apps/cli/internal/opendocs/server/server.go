@@ -25,6 +25,7 @@ import (
 	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
 	"github.com/smithg09/openplan/cli/internal/opendocs/remote"
 	"github.com/smithg09/openplan/cli/internal/opendocs/render"
+	"github.com/smithg09/openplan/cli/internal/opendocs/sample"
 	"github.com/smithg09/openplan/cli/internal/opendocs/search"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
@@ -85,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 	} else {
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
 		mux.HandleFunc("GET /api/search", s.handleSearch)
+		mux.HandleFunc("GET /api/sample", s.handleSample)
 		mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 		mux.HandleFunc("POST /api/settings", s.handleSetSettings)
 		mux.HandleFunc("GET /api/docs/{doc}/remote", s.handleRemoteStatus)
@@ -229,6 +231,12 @@ func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"docs": docs})
+}
+
+// handleSample serves the bundled interactive sample document (local mode) so
+// the UI can offer it as a first-run example.
+func (s *Server) handleSample(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"slug": sample.Slug, "html": sample.HTML()})
 }
 
 // handleSearch finds documents in this project by title and latest text. It is

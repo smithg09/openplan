@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
+import { Icon, GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
 
 declare const __APP_VERSION__: string;
 
@@ -50,7 +50,7 @@ export default function Hero() {
       </div>
 
       <div className="hctas">
-        <a href="#demo" className="btnp">Try the review UI ↓</a>
+        <a href="#demo" className="btnp">Try the review UI <Icon name="arrow_down" size={14} /></a>
         <a href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" className="btno"><GithubIcon /> View on GitHub</a>
       </div>
     </div>

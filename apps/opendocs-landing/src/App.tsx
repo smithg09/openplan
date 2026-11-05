@@ -20,7 +20,7 @@ export default function App() {
       <Nav theme={theme} onToggle={toggle} />
       <Hero />
       <TrustStrip />
-      <DemoSection />
+      <DemoSection theme={theme} />
       <FlowSection />
       <Features />
       <Faq />

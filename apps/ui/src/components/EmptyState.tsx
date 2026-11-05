@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@openplan/annotations';
 
 export const EmptyState: React.FC = () => (
   <div style={{
@@ -7,10 +8,7 @@ export const EmptyState: React.FC = () => (
     padding: '40px 24px', textAlign: 'center', userSelect: 'none',
   }}>
     <div style={{ marginBottom: 20, opacity: 0.35 }}>
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="6" y="4" width="28" height="32" rx="3" />
-        <path d="M12 12h16M12 18h16M12 24h10" />
-      </svg>
+      <Icon name="description" size={40} />
     </div>
     <div style={{ color: 'var(--text-muted)', marginBottom: 6 }}>// select a file to begin</div>
     <div style={{ opacity: 0.6, fontSize: 11 }}>Pick a file from the sidebar</div>

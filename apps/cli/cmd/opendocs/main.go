@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"text/tabwriter"
 
+	"github.com/smithg09/openplan/cli/internal/opendocs/sample"
 	"github.com/smithg09/openplan/cli/internal/opendocs/server"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 	"github.com/spf13/cobra"
@@ -42,7 +43,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Version = version
-	rootCmd.AddCommand(createCmd, versionsCmd, commentsCmd, openCmd, serveCmd, guidelinesCmd)
+	rootCmd.AddCommand(createCmd, versionsCmd, commentsCmd, openCmd, serveCmd, guidelinesCmd, demoCmd)
 }
 
 // projectSlug derives a stable per-project key from the current directory.
@@ -175,6 +176,24 @@ var openCmd = &cobra.Command{
 		srv := server.New(store.New().Backend(), project, version)
 		srv.SetFocus(docSlug)
 		return ignoreInterrupt(runServer(cmd, srv, "/?doc="+docSlug, false))
+	},
+}
+
+// demoCmd opens the bundled interactive sample so you can try the review UI
+// without writing a document first.
+var demoCmd = &cobra.Command{
+	Use:   "demo",
+	Short: "Open a bundled interactive sample document in the review UI",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		project := projectSlug()
+		doc := store.New().Doc(project, sample.Slug)
+		if err := snapshotIfChanged(doc, []byte(sample.HTML())); err != nil {
+			return err
+		}
+		srv := server.New(store.New().Backend(), project, version)
+		srv.SetFocus(sample.Slug)
+		return ignoreInterrupt(runServer(cmd, srv, "/?doc="+sample.Slug, false))
 	},
 }
 
@@ -407,7 +426,7 @@ func init() {
 	createCmd.Flags().String("summary", "", "Change summary")
 
 	openCmd.Flags().String("name", "", "Document name (defaults to the file name)")
-	for _, c := range []*cobra.Command{openCmd, serveCmd} {
+	for _, c := range []*cobra.Command{openCmd, serveCmd, demoCmd} {
 		c.Flags().Int("port", 0, "Preferred port (0 = pick an open one)")
 		c.Flags().Bool("no-browser", false, "Don't open a browser")
 	}

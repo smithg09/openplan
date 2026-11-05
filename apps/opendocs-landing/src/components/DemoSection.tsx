@@ -1,117 +1,113 @@
 import React from 'react';
-import { AnnoCard } from '@openplan/annotations';
+import { AnnoCard, Icon } from '@openplan/annotations';
 import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
 import type { Annotation, AnnotationType } from '@openplan/shared';
+// The demo runs the REAL pieces: the same bridge script the app injects, the same
+// highlight stylesheet, and the sample document `opendocs demo` ships.
+import bridgeJS from '../../../cli/internal/opendocs/render/bridge.js?raw';
+import bridgeCSS from '../../../cli/internal/opendocs/render/bridge.css?raw';
+import sampleHTML from '../../../cli/internal/opendocs/sample/retry-storm.html?raw';
 
-// A working miniature of the real review UI, built from the same components the
-// app uses (selection toolbar, comment popover, comment cards). Select any text.
-
-interface Block { tag: 'h1' | 'h2' | 'p'; text: string }
-const DOC: Block[] = [
-  { tag: 'h1', text: 'Postmortem: checkout latency, 14 October' },
-  { tag: 'p', text: 'Between 21:08 and 22:41 UTC, p95 checkout latency rose from 410 ms to 3.9 s. 6.2% of sessions abandoned the cart, against a usual 1.8%.' },
-  { tag: 'h2', text: 'What happened' },
-  { tag: 'p', text: 'A schema migration on the orders table held a lock for 11 minutes. Payment authorisations queued behind it, and the retry policy tripled the load once the lock released.' },
-  { tag: 'h2', text: 'What we are changing' },
-  { tag: 'p', text: 'We will run migrations through the online-schema tool only, and cap payment retries at two attempts with jittered backoff.' },
-  { tag: 'p', text: 'The on-call rota moves to a follow-the-sun pattern from 1 December.' },
-];
-
+interface Anchor { quote: string; prefix?: string; suffix?: string; start?: number; end?: number }
 interface Reply { id: string; author: string; body: string; createdAt: string }
 interface Note {
-  id: string; p: number; start: number; end: number; quote: string;
-  type: AnnotationType; body: string; suggestion?: string; author: string; createdAt: string;
-  resolved: boolean; replies: Reply[]; reactions: Record<string, string[]>; // emoji -> authors
+  id: string; anchor: Anchor; type: AnnotationType; body: string; suggestion?: string; author: string; createdAt: string;
+  resolved: boolean; replies: Reply[]; reactions: Record<string, string[]>;
 }
+type Rect = { top: number; left: number; width: number; height: number };
 
 const ME = 'You';
 const ago = (m: number) => new Date(Date.now() - m * 60000).toISOString();
 
-const loc = (p: number, quote: string) => { const start = DOC[p].text.indexOf(quote); return { p, start, end: start + quote.length, quote }; };
-
-const seed = (): Note[] => [
-  { id: 'n1', ...loc(1, '6.2% of sessions abandoned the cart'), type: 'question', author: 'Wanjiru Kamau', createdAt: ago(52), resolved: false, replies: [], reactions: {},
+const SEED: Note[] = [
+  { id: 'n1', anchor: { quote: 'because our clients tried to be helpful' }, type: 'suggestion', author: 'Tomasz Brandt', createdAt: ago(30), resolved: false, replies: [], reactions: {},
+    body: 'The clients did what we told them to. Say so.', suggestion: 'because our retry policy told every client to try again at once' },
+  { id: 'n2', anchor: { quote: 'of sessions abandoned the cart' }, type: 'question', author: 'Wanjiru Kamau', createdAt: ago(48), resolved: false, replies: [], reactions: {},
     body: 'Is that against all sessions, or only those that reached payment? Finance will ask.' },
-  { id: 'n2', ...loc(5, 'run migrations through the online-schema tool only'), type: 'suggestion', author: 'Tomasz Brandt', createdAt: ago(31), resolved: false, replies: [], reactions: {},
-    body: '“Only” is hard to enforce. A CI check is not.', suggestion: 'block any migration touching orders unless CI has a dry run on a production-sized replica' },
-  { id: 'n3', ...loc(6, 'follow-the-sun'), type: 'comment', author: 'Ife Adeyemi', createdAt: ago(12), resolved: false, reactions: { '👍': ['Wanjiru Kamau', 'Tomasz Brandt'] },
-    body: 'Do we have the APAC headcount for this by December?',
-    replies: [{ id: 'r1', author: 'Wanjiru Kamau', body: 'Two hires are approved; the first starts on 3 November.', createdAt: ago(6) }] },
+  { id: 'n3', anchor: { quote: 'three attempts with no delay between them' }, type: 'comment', author: 'Ife Adeyemi', createdAt: ago(11), resolved: false, reactions: { '👍': ['Wanjiru Kamau', 'Tomasz Brandt'] },
+    body: 'Was that the default, or did someone set it? I want it in the actions.',
+    replies: [{ id: 'r1', author: 'Wanjiru Kamau', body: 'It was the default in the shared client library since 2022.', createdAt: ago(6) }] },
 ];
 
-const COLORS: Record<string, string> = { comment: 'var(--comment)', question: 'var(--question)', suggestion: 'var(--teal)', deletion: 'var(--danger)', emoji: 'var(--text-muted)' };
+/** Same injection the Go server does (render.Frame). */
+function buildFrame(html: string): string {
+  const inject = `<style id="opendocs-bridge-style">${bridgeCSS}</style><script>${bridgeJS}</script>`;
+  const m = /<head[\s>]/i.exec(html);
+  if (!m) return inject + html;
+  const end = html.indexOf('>', m.index);
+  return html.slice(0, end + 1) + inject + html.slice(end + 1);
+}
 
 function toAnno(n: Note): Annotation {
   return {
-    id: n.id, type: n.type, selectedText: n.quote, from: n.start, to: n.end, body: n.body, suggestion: n.suggestion,
+    id: n.id, type: n.type, selectedText: n.anchor.quote, from: 0, to: 0, body: n.body, suggestion: n.suggestion,
     author: n.author, createdAt: n.createdAt, resolved: n.resolved,
     replies: n.replies.map((r) => ({ id: r.id, body: r.body, author: r.author, createdAt: r.createdAt, reactions: [] })),
     reactions: Object.entries(n.reactions).map(([emoji, who]) => ({ emoji, count: who.length, reactedByMe: who.includes(ME), reactors: who })),
   };
 }
 
-type Sel = { p: number; start: number; end: number; quote: string; x: number; y: number };
-
-export default function DemoSection() {
-  const [notes, setNotes] = React.useState<Note[]>(seed);
-  const [sel, setSel] = React.useState<Sel | null>(null);
+export default function DemoSection({ theme }: { theme: 'dark' | 'light' }) {
+  const [notes, setNotes] = React.useState<Note[]>(SEED);
+  const [sel, setSel] = React.useState<{ anchor: Anchor; rect: Rect } | null>(null);
   const [composer, setComposer] = React.useState<null | 'comment' | 'question' | 'suggestion'>(null);
   const [focus, setFocus] = React.useState<string | null>(null);
   const [hover, setHover] = React.useState<string | null>(null);
-  const [tops, setTops] = React.useState<Record<string, number>>({});
+  const [layout, setLayout] = React.useState({ scrollTop: 0, scrollHeight: 0, anchors: {} as Record<string, number> });
   const [heights, setHeights] = React.useState<Record<string, number>>({});
-  const docRef = React.useRef<HTMLDivElement>(null);
-  const marks = React.useRef<Record<string, HTMLElement | null>>({});
+  const frame = React.useRef<HTMLIFrameElement>(null);
+  const box = React.useRef<HTMLDivElement>(null);
   const cards = React.useRef<Record<string, HTMLDivElement | null>>({});
+  const notesRef = React.useRef(notes); notesRef.current = notes;
+  const themeRef = React.useRef(theme); themeRef.current = theme;
+  const composerRef = React.useRef(composer); composerRef.current = composer;
+  const srcDoc = React.useMemo(() => buildFrame(sampleHTML), []);
 
-  // Measure where each highlight sits and how tall each card is.
+  const post = React.useCallback((m: unknown) => frame.current?.contentWindow?.postMessage(m, '*'), []);
+  const paint = React.useCallback((list: Note[]) => post({ type: 'opendocs:paint', anchors: list.map((n) => ({ id: n.id, anchor: n.anchor, status: n.resolved ? 'resolved' : 'open', type: n.type })) }), [post]);
+
+  React.useEffect(() => { post({ type: 'opendocs:theme', theme }); }, [theme, post]);
+  React.useEffect(() => { paint(notes); }, [notes, paint]);
+
+  React.useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      if (ev.source !== frame.current?.contentWindow) return;
+      const m = ev.data;
+      if (!m || typeof m.type !== 'string') return;
+      if (m.type === 'opendocs:ready') { post({ type: 'opendocs:theme', theme: themeRef.current }); paint(notesRef.current); }
+      else if (m.type === 'opendocs:selection') setSel({ anchor: m.anchor, rect: m.rect });
+      else if (m.type === 'opendocs:selection-cleared') { if (!composerRef.current) setSel(null); }
+      else if (m.type === 'opendocs:activate') setFocus(m.id);
+      else if (m.type === 'opendocs:scroll') setLayout((l) => ({ ...l, scrollTop: m.scrollTop }));
+      else if (m.type === 'opendocs:layout') setLayout({ scrollTop: m.scrollTop, scrollHeight: m.scrollHeight, anchors: m.anchors });
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [post, paint]);
+
   React.useLayoutEffect(() => {
-    const next: Record<string, number> = {};
-    for (const n of notes) { const m = marks.current[n.id]; if (m) next[n.id] = m.offsetTop; }
-    setTops((t) => (JSON.stringify(t) === JSON.stringify(next) ? t : next));
     const h: Record<string, number> = {};
     for (const n of notes) { const c = cards.current[n.id]; if (c) h[n.id] = c.offsetHeight; }
     setHeights((o) => (JSON.stringify(o) === JSON.stringify(h) ? o : h));
   });
 
-  const laidOut = React.useMemo(() => {
-    const order = [...notes].sort((a, b) => (tops[a.id] ?? 0) - (tops[b.id] ?? 0));
+  const tops = React.useMemo(() => {
+    const ordered = [...notes].sort((a, b) => (layout.anchors[a.id] ?? 1e9) - (layout.anchors[b.id] ?? 1e9));
     const out: Record<string, number> = {};
     let cursor = -Infinity;
-    for (const n of order) {
-      let top = (tops[n.id] ?? 0) - 4;
+    for (const n of ordered) {
+      let top = (layout.anchors[n.id] ?? 0) - 6;
       if (cursor !== -Infinity && top < cursor + 10) top = cursor + 10;
       out[n.id] = top;
       cursor = top + (heights[n.id] ?? 110);
     }
-    return { out, end: cursor === -Infinity ? 0 : cursor };
-  }, [notes, tops, heights]);
-
-  const onMouseUp = () => {
-    const s = window.getSelection();
-    const doc = docRef.current;
-    if (!s || s.isCollapsed || !doc || s.rangeCount === 0) { if (!composer) setSel(null); return; }
-    const range = s.getRangeAt(0);
-    const startEl = (range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer as Element)?.closest('[data-p]');
-    const endEl = (range.endContainer.nodeType === 3 ? range.endContainer.parentElement : range.endContainer as Element)?.closest('[data-p]');
-    if (!startEl || startEl !== endEl || !doc.contains(startEl)) { if (!composer) setSel(null); return; }
-    const quote = s.toString().replace(/\s+/g, ' ').trim();
-    if (!quote) return;
-    const pre = document.createRange();
-    pre.setStart(startEl, 0);
-    pre.setEnd(range.startContainer, range.startOffset);
-    const start = pre.toString().length;
-    const end = start + s.toString().length;
-    const rect = range.getBoundingClientRect();
-    setSel({ p: Number((startEl as HTMLElement).dataset.p), start, end, quote, x: rect.left + rect.width / 2, y: rect.top });
-  };
+    return out;
+  }, [notes, layout.anchors, heights]);
 
   const add = (type: AnnotationType, body: string, suggestion?: string) => {
     if (!sel) return;
-    const n: Note = { id: `n${Date.now()}`, p: sel.p, start: sel.start, end: sel.end, quote: sel.quote, type, body, suggestion, author: ME, createdAt: new Date().toISOString(), resolved: false, replies: [], reactions: {} };
-    setNotes((l) => [...l, n]);
-    setSel(null); setComposer(null); setFocus(n.id);
-    window.getSelection()?.removeAllRanges();
+    const n: Note = { id: `n${Date.now()}`, anchor: sel.anchor, type, body, suggestion, author: ME, createdAt: new Date().toISOString(), resolved: false, replies: [], reactions: {} };
+    setNotes((l) => [...l, n]); setSel(null); setComposer(null); setFocus(n.id);
   };
   const onToolbar = (type: string, meta?: { emoji?: string }) => {
     if (type === 'comment' || type === 'question' || type === 'suggestion') setComposer(type);
@@ -120,81 +116,67 @@ export default function DemoSection() {
   };
   const patch = (id: string, f: (n: Note) => Note) => setNotes((l) => l.map((n) => (n.id === id ? f(n) : n)));
 
-  // Render a paragraph with its highlights.
-  const renderBlock = (b: Block, i: number) => {
-    const mine = notes.filter((n) => n.p === i && n.end <= b.text.length).sort((a, c) => a.start - c.start);
-    const parts: React.ReactNode[] = [];
-    let at = 0;
-    for (const n of mine) {
-      if (n.start < at) continue; // overlapping: skip highlight, keep the comment
-      if (n.start > at) parts.push(b.text.slice(at, n.start));
-      parts.push(
-        <mark key={n.id} ref={(el) => { marks.current[n.id] = el; }} className={`dm-hl t-${n.type} ${n.resolved ? 'is-done' : ''} ${focus === n.id ? 'is-focus' : ''}`}
-          style={{ ['--hl' as string]: COLORS[n.type] }} onClick={() => setFocus(n.id)}>{b.text.slice(n.start, n.end)}</mark>,
-      );
-      at = n.end;
-    }
-    if (at < b.text.length) parts.push(b.text.slice(at));
-    const Tag = b.tag;
-    return <Tag key={i} data-p={i} className="dm-block">{parts}</Tag>;
-  };
-
+  // Floating UI in viewport coordinates: iframe origin + selection rect.
+  const fr = frame.current?.getBoundingClientRect();
+  const bar = sel && fr && sel.rect.top > -10 && sel.rect.top < fr.height ? { x: fr.left + sel.rect.left + sel.rect.width / 2 - 86, y: fr.top + sel.rect.top - 46 } : null;
+  const pop = sel && fr ? { x: Math.max(12, Math.min(fr.left + sel.rect.left + sel.rect.width / 2 - 160, window.innerWidth - 340)), y: Math.min(fr.top + sel.rect.top + sel.rect.height + 12, window.innerHeight - 260) } : null;
   const open = notes.filter((n) => !n.resolved).length;
-  const popPos = sel ? { x: Math.max(12, Math.min(sel.x - 160, window.innerWidth - 340)), y: Math.min(sel.y + 34, window.innerHeight - 260) } : null;
-  const barPos = sel ? { x: Math.max(8, sel.x - 86), y: sel.y > 70 ? sel.y - 46 : sel.y + 28 } : null;
 
   return (
     <section className="lp-demo-section" id="demo">
       <div className="wrap">
         <div className="sc">
           <div className="slabel">Try it</div>
-          <h2 className="stitle">Review the way your team will</h2>
-          <p className="ssub">This is a real incident postmortem an agent wrote. Select any words: comment, ask, suggest a rewrite, strike it, or react. Cards stay level with the text.</p>
+          <h2 className="stitle">A real interactive document, reviewed the real way</h2>
+          <p className="ssub">This is the sample document that ships with <code>opendocs demo</code>: a live chart you can drag, a checklist and tabs. Select any words to comment, ask or suggest — your cards stay level with the text.</p>
         </div>
 
-        <div className="dw">
+        <div className="dw" ref={box}>
           <div className="dtb">
             <span className="tbd" style={{ background: '#ff5f57' }} /><span className="tbd" style={{ background: '#febc2e' }} /><span className="tbd" style={{ background: '#28c840' }} />
-            <span className="tbt"><b style={{ color: 'var(--accent-fg)' }}>$ /</b> opendocs / checkout-latency-postmortem.html</span>
-            <span className="tbp">v2 · {open} open</span>
+            <span className="tbt"><b style={{ color: 'var(--accent-fg)' }}>$ /</b> opendocs / retry-storm</span>
+            <span className="tbp">v3 · {open} open</span>
           </div>
           <div className="dm-main">
-            <div className="dm-doc" ref={docRef} onMouseUp={onMouseUp}>{DOC.map(renderBlock)}</div>
+            <iframe ref={frame} className="dm-frame" title="Sample document" sandbox="allow-scripts" srcDoc={srcDoc} />
             <div className="dm-rail">
-              <div className="dm-track" style={{ height: Math.max(laidOut.end + 24, 300) }}>
-                {notes.length === 0 && <div className="dm-empty">No comments left. Select text in the document to start one.</div>}
-                {notes.map((n) => {
-                  const expanded = focus === n.id || hover === n.id;
-                  return (
-                    <div key={n.id} ref={(el) => { cards.current[n.id] = el; }} className="dm-card" style={{ top: Math.round(laidOut.out[n.id] ?? 0), zIndex: expanded ? 3 : 1 }}
-                      onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}>
-                      <AnnoCard
-                        anno={toAnno(n)} isFocus={focus === n.id} expanded={expanded}
-                        onClick={() => { setFocus(n.id); marks.current[n.id]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }}
-                        onEdit={n.author === ME ? (id, body) => patch(id, (x) => ({ ...x, body })) : undefined}
-                        onRemove={() => setNotes((l) => l.filter((x) => x.id !== n.id))}
-                        onResolve={(id) => patch(id, (x) => ({ ...x, resolved: !x.resolved }))}
-                        onReply={(id, body) => patch(id, (x) => ({ ...x, replies: [...x.replies, { id: `r${Date.now()}`, author: ME, body, createdAt: new Date().toISOString() }] }))}
-                        onReact={(id, emoji) => patch(id, (x) => {
-                          const who = x.reactions[emoji] ?? [];
-                          const next = who.includes(ME) ? who.filter((w) => w !== ME) : [...who, ME];
-                          const reactions = { ...x.reactions };
-                          if (next.length) reactions[emoji] = next; else delete reactions[emoji];
-                          return { ...x, reactions };
-                        })}
-                      />
-                    </div>
-                  );
-                })}
+              <div className="dm-rail-head"><b>Comments</b><span>{open}</span></div>
+              <div className="dm-rail-view">
+                <div className="dm-track" style={{ transform: `translateY(${-layout.scrollTop - 38}px)` }}>
+                  {notes.map((n) => {
+                    const expanded = focus === n.id || hover === n.id;
+                    return (
+                      <div key={n.id} ref={(el) => { cards.current[n.id] = el; }} className="dm-card" style={{ top: Math.round(tops[n.id] ?? 0), zIndex: expanded ? 3 : 1 }}
+                        onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover((h) => (h === n.id ? null : h))}>
+                        <AnnoCard
+                          anno={toAnno(n)} isFocus={focus === n.id} expanded={expanded}
+                          onClick={() => { setFocus(n.id); post({ type: 'opendocs:scroll-to', id: n.id }); }}
+                          onEdit={n.author === ME ? (id, body) => patch(id, (x) => ({ ...x, body })) : undefined}
+                          onRemove={() => setNotes((l) => l.filter((x) => x.id !== n.id))}
+                          onResolve={(id) => patch(id, (x) => ({ ...x, resolved: !x.resolved }))}
+                          onReply={(id, body) => patch(id, (x) => ({ ...x, replies: [...x.replies, { id: `r${Date.now()}`, author: ME, body, createdAt: new Date().toISOString() }] }))}
+                          onReact={(id, emoji) => patch(id, (x) => {
+                            const who = x.reactions[emoji] ?? [];
+                            const next = who.includes(ME) ? who.filter((w) => w !== ME) : [...who, ME];
+                            const reactions = { ...x.reactions };
+                            if (next.length) reactions[emoji] = next; else delete reactions[emoji];
+                            return { ...x, reactions };
+                          })}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {notes.length === 0 && <div className="dm-empty"><Icon name="chat_bubble" size={20} /><br />No comments left. Select text in the document to start one.</div>}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {sel && barPos && !composer && <SelectionToolbar pos={barPos} onAction={onToolbar} />}
-      {sel && popPos && composer === 'suggestion' && <SuggestionPopover pos={popPos} quote={sel.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(body, s) => add('suggestion', body, s)} />}
-      {sel && popPos && (composer === 'comment' || composer === 'question') && <CommentPopover pos={popPos} type={composer} quote={sel.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(body) => add(composer, body)} />}
+      {sel && bar && !composer && <SelectionToolbar pos={bar} onAction={onToolbar} />}
+      {sel && pop && composer === 'suggestion' && <SuggestionPopover pos={pop} quote={sel.anchor.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(b, s) => add('suggestion', b, s)} />}
+      {sel && pop && (composer === 'comment' || composer === 'question') && <CommentPopover pos={pop} type={composer} quote={sel.anchor.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(b) => add(composer, b)} />}
     </section>
   );
 }

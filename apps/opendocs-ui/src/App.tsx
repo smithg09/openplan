@@ -287,6 +287,15 @@ export default function App() {
     showToast('Restored as the new latest version');
   };
 
+  const openSample = async () => {
+    try {
+      const smp = await api.sample();
+      await importHtml(smp.slug, smp.html, 'sample');
+      setDocs((await api.listDocs()).docs ?? []);
+      await openDoc(smp.slug);
+    } catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
+  };
+
   const exportMd = () => download(`${docSlug}-comments.md`, commentsToMarkdown(title, comments), 'text/markdown');
   const exportJson = () => download(`${docSlug}-comments.json`, commentsToJSON(comments), 'application/json');
   const downloadHtml = async () => {
@@ -378,6 +387,7 @@ export default function App() {
               <Icon name="description" size={30} />
               <h2>{mode === 'proxy' ? 'Open a share link' : 'No document open'}</h2>
               <p>{mode === 'proxy' ? 'Ask the document’s owner for a link.' : <>Pick a document on the left, open a folder of HTML files, or run <code>opendocs open report.html</code>.</>}</p>
+              {mode === 'local' && <button className="op-btn op-btn-primary op-btn-md" style={{ marginTop: 10 }} onClick={() => void openSample()}>Open the sample document</button>}
             </div>
           )}
           {docSlug && !frameHtml && <div className="od-skeleton" aria-hidden="true"><i /><i /><i /><i /></div>}

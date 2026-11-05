@@ -1,4 +1,5 @@
 import React from 'react';
+import Reveal from './Reveal';
 
 const FAQ: [string, string][] = [
   ['What is opendocs?', 'A review space for the HTML documents your agents produce. The agent publishes a self-contained HTML file, your team comments on exact sentences, and the agent reads the comments and publishes the next version — one document, full history.'],
@@ -14,16 +15,24 @@ const FAQ: [string, string][] = [
 export default function Faq() {
   const [open, setOpen] = React.useState<number | null>(0);
   return (
-    <section className="ps" id="faq">
-      <div className="wrap fq-wrap">
-        <div className="slabel">FAQ</div>
-        <h2 className="stitle">Questions, answered plainly</h2>
+    <section className="ps fq-sec" id="faq">
+      <div className="wrap fq-grid">
+        <Reveal>
+          <div className="fq-aside">
+            <div className="slabel">FAQ</div>
+            <h2 className="stitle">Questions, answered plainly</h2>
+            <p className="ssub">Anything missing? Open an issue and it goes here.</p>
+            <a className="fq-link" href="https://github.com/smithg09/openplan/issues" target="_blank" rel="noreferrer">Ask on GitHub</a>
+          </div>
+        </Reveal>
         <div className="fq">
           {FAQ.map(([q, a], i) => (
-            <div key={q} className={`fq-i${open === i ? ' open' : ''}`}>
-              <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}><span>{q}</span><i>{open === i ? '–' : '+'}</i></button>
-              {open === i && <p>{a}</p>}
-            </div>
+            <Reveal key={q} i={i}>
+              <div className={`fq-i${open === i ? ' open' : ''}`}>
+                <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}><span>{q}</span><i>{open === i ? '–' : '+'}</i></button>
+                <div className="fq-a"><p>{a}</p></div>
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>

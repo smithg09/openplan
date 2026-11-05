@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Icon } from './ui';
+import { Icon } from './icons';
 
 export type RailFilter = 'all' | 'open' | 'resolved';
 
@@ -17,8 +17,8 @@ export const RailHeader: React.FC<{
       <span className="op-rail-title">Comments</span>
       <span className="op-rail-count">{count}</span>
       <div style={{ flex: 1 }} />
-      {onCopyMD && <Button size="sm" kind="ghost" onClick={onCopyMD} title="Copy as Markdown">Copy MD</Button>}
-      <Button size="sm" icon={<Icon name="close" size={15} />} title="Close comments" onClick={onClose} />
+      {onCopyMD && <button className="op-btn op-btn-ghost op-btn-sm" onClick={onCopyMD} title="Copy as Markdown"><span>Copy MD</span></button>}
+      <button className="op-btn op-btn-ghost op-btn-sm op-btn-icon-only" onClick={onClose} title="Close comments" aria-label="Close comments"><span className="op-btn-icon"><Icon name="close" size={15} /></span></button>
     </div>
     {filter && counts && onFilter && (
       <div className="op-rail-tabs" role="tablist">

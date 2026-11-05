@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a retry storm took down checkout</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1c1c1e; --muted:#6b6b72; --line:#e4e4e7; --accent:#2563eb; --warn:#c2410c; --ok:#15803d; --panel:#f3f3f1; --grid:#e9e9e6; }
+  html[data-theme="dark"] { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; --grid:#25252a; }
+  @media (prefers-color-scheme: dark) { html:not([data-theme]) { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; --grid:#25252a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 700px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow { font:600 11px/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-size: 34px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 12px; }
+  h2 { font-size: 21px; letter-spacing: -.01em; margin: 48px 0 10px; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 18px; color: var(--muted); }
+  .stats { display:flex; gap: 36px; margin: 28px 0 8px; padding: 18px 0; border-block: 1px solid var(--line); flex-wrap: wrap; }
+  .stats b { display:block; font: 650 26px/1.1 ui-sans-serif, system-ui; letter-spacing: -.02em; }
+  .stats span { font-size: 13px; color: var(--muted); }
+  .lab { background: var(--panel); border-radius: 12px; padding: 20px 22px 16px; margin: 22px 0 8px; }
+  .lab h3 { margin: 0 0 2px; font-size: 15px; }
+  .lab .sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+  .controls { display:flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 14px; }
+  .controls label { display:flex; gap: 10px; align-items:center; }
+  input[type=range] { accent-color: var(--accent); width: 160px; }
+  svg { width: 100%; height: auto; display:block; }
+  .readout { display:flex; gap: 28px; font-size: 13px; color: var(--muted); flex-wrap: wrap; margin-top: 6px; }
+  .readout b { color: var(--fg); font-weight: 600; }
+  .readout .hot { color: var(--warn); }
+  ul.check { list-style:none; padding:0; margin: 8px 0 0; }
+  ul.check li { display:flex; gap:12px; align-items:flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  ul.check li:last-child { border-bottom: 0; }
+  ul.check i { flex:none; width:18px; height:18px; margin-top:4px; border-radius:5px; border:1.5px solid var(--muted); display:grid; place-items:center; font-style:normal; font-size:12px; color:transparent; }
+  ul.check li.done i { background: var(--ok); border-color: var(--ok); color: #fff; }
+  ul.check li.done span { color: var(--muted); text-decoration: line-through; }
+  .tabs { display:flex; gap: 4px; margin: 18px 0 0; border-bottom: 1px solid var(--line); }
+  .tabs button { font: inherit; font-size: 14px; color: var(--muted); background:none; border:0; padding: 8px 14px; cursor:pointer; border-bottom: 2px solid transparent; margin-bottom:-1px; }
+  .tabs button[aria-selected=true] { color: var(--fg); border-bottom-color: var(--accent); }
+  pre { margin: 0; padding: 16px 18px; background: var(--panel); border-radius: 0 0 10px 10px; overflow:auto; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; }
+  .grid { stroke: var(--grid); stroke-width: 1; }
+  .axis { fill: var(--muted); font: 11px ui-monospace, monospace; }
+  .area { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .line { fill:none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+  .cap { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .lockbar { fill: color-mix(in srgb, var(--warn) 14%, transparent); }
+  table { width:100%; border-collapse: collapse; font-size: 14.5px; margin-top: 8px; }
+  th, td { text-align:left; padding: 9px 10px 9px 0; border-bottom: 1px solid var(--line); }
+  th { font: 600 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Incident explainer</div>
+  <h1>How a retry storm took down checkout</h1>
+  <p class="lede">An eleven-minute database lock should have cost us eleven minutes. It cost us ninety-three, because our clients tried to be helpful.</p>
+
+  <div class="stats">
+    <div><b>410 ms → 3.9 s</b><span>p95 checkout latency</span></div>
+    <div><b>6.2%</b><span>of sessions abandoned the cart</span></div>
+    <div><b>93 min</b><span>from first alert to recovery</span></div>
+  </div>
+
+  <h2>What happened</h2>
+  <p>At 21:08 UTC a schema migration on the orders table took a lock and held it for eleven minutes. Payment authorisations queued behind it. Every failed call was retried, and the retry policy was three attempts with no delay between them, so the queue grew faster than the database could ever drain it.</p>
+  <p>When the lock released at 21:19, every client that had been waiting fired its pending retries at the same moment. That synchronised burst, not the lock itself, is what kept checkout down until 22:41.</p>
+
+  <h2>Try it: change the retry policy</h2>
+  <p>This is a simplified model of that evening. Move the slider and toggle jitter to see how the policy changes the load our database saw.</p>
+  <div class="lab" id="lab">
+    <h3>Requests per second reaching the database</h3>
+    <p class="sub">Normal traffic is 1,200 requests per second. The lock holds from minute 8 to minute 19.</p>
+    <div class="controls">
+      <label>Retries per failed call <input id="retries" type="range" min="0" max="5" value="3"> <b id="retriesOut">3</b></label>
+      <label><input id="jitter" type="checkbox"> Add jittered backoff</label>
+    </div>
+    <svg id="chart" viewBox="0 0 640 250" role="img" aria-label="Load over time"></svg>
+    <div class="readout"><span>Peak load <b id="peak" class="hot">—</b></span><span>Load at recovery <b id="after">—</b></span><span>Minutes above capacity <b id="over">—</b></span></div>
+  </div>
+
+  <h2>What we are changing</h2>
+  <p>Click an item to mark it done as the work lands.</p>
+  <ul class="check" id="todo">
+    <li><i>✓</i><span>Cap payment retries at two attempts, with exponential backoff and full jitter.</span></li>
+    <li><i>✓</i><span>Run schema changes through the online-migration tool only; block anything that touches <code>orders</code> without a dry run on a production-sized replica.</span></li>
+    <li><i>✓</i><span>Add a load-shedding switch that returns a fast 503 once the queue passes a threshold.</span></li>
+    <li><i>✓</i><span>Move the on-call rota to a follow-the-sun pattern from 1 December.</span></li>
+  </ul>
+
+  <h2>The retry policy, before and after</h2>
+  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="before">Before</button><button role="tab" aria-selected="false" data-tab="after">After</button></div>
+  <pre id="code"></pre>
+
+  <h2>Options we considered</h2>
+  <table>
+    <thead><tr><th>Option</th><th>Effort</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Fix only the migration process</td><td>Low</td><td>Necessary, not sufficient</td></tr>
+      <tr><td>Retry budget with jittered backoff</td><td>Medium</td><td>Adopted</td></tr>
+      <tr><td>Queue-depth load shedding</td><td>Medium</td><td>Adopted</td></tr>
+      <tr><td>Rewrite the payment client</td><td>High</td><td>Rejected for now</td></tr>
+    </tbody>
+  </table>
+</main>
+<script>
+(function () {
+  var base = 1200, cap = 2600, N = 60, lockFrom = 8, lockTo = 19;
+  var W = 640, H = 250, L = 44, R = 12, T = 12, B = 28, plotW = W - L - R, plotH = H - T - B, maxY = 15000;
+  function load(t, retries, jitter) {
+    if (t < lockFrom) return base;
+    if (t < lockTo) return base * (1 + 0.8 * retries);                  // clients retrying into a locked table
+    var since = t - lockTo, burst = base * retries * 3.2;                // everyone retries at once when it unlocks
+    var decay = Math.exp(-since / (jitter ? 1.6 : 5.5));
+    var spread = jitter ? 0.28 : 1;
+    return base + burst * spread * decay;
+  }
+  function x(t) { return L + (t / N) * plotW; }
+  function y(v) { return T + plotH - (Math.min(v, maxY) / maxY) * plotH; }
+  function draw() {
+    var retries = +document.getElementById('retries').value, jitter = document.getElementById('jitter').checked;
+    document.getElementById('retriesOut').textContent = retries;
+    var pts = [], peak = 0, over = 0;
+    for (var t = 0; t <= N; t += 0.5) { var v = load(t, retries, jitter); pts.push([x(t), y(v)]); if (v > peak) peak = v; if (v > cap && t % 1 === 0) over++; }
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+    var svg = '';
+    for (var g = 0; g <= 3; g++) { var gv = (maxY / 3) * g; svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(gv) + '" y2="' + y(gv) + '"/><text class="axis" x="' + (L - 8) + '" y="' + (y(gv) + 4) + '" text-anchor="end">' + Math.round(gv / 1000) + 'k</text>'; }
+    svg += '<rect class="lockbar" x="' + x(lockFrom) + '" y="' + T + '" width="' + (x(lockTo) - x(lockFrom)) + '" height="' + plotH + '"/>';
+    svg += '<text class="axis" x="' + (x(lockFrom) + 6) + '" y="' + (T + 14) + '">table locked</text>';
+    svg += '<line class="cap" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(cap) + '" y2="' + y(cap) + '"/><text class="axis" x="' + (W - R) + '" y="' + (y(cap) - 6) + '" text-anchor="end">database capacity</text>';
+    svg += '<path class="area" d="' + d + ' L ' + x(N) + ' ' + y(0) + ' L ' + x(0) + ' ' + y(0) + ' Z"/><path class="line" d="' + d + '"/>';
+    for (var m = 0; m <= N; m += 10) svg += '<text class="axis" x="' + x(m) + '" y="' + (H - 8) + '" text-anchor="middle">' + m + ' min</text>';
+    document.getElementById('chart').innerHTML = svg;
+    document.getElementById('peak').textContent = Math.round(peak).toLocaleString() + ' req/s';
+    document.getElementById('after').textContent = Math.round(load(30, retries, jitter)).toLocaleString() + ' req/s';
+    document.getElementById('over').textContent = over + (over === 1 ? ' minute' : ' minutes');
+  }
+  document.getElementById('retries').addEventListener('input', draw);
+  document.getElementById('jitter').addEventListener('change', draw);
+  draw();
+
+  document.querySelectorAll('#todo li').forEach(function (li) { li.addEventListener('click', function () { li.classList.toggle('done'); }); });
+
+  var code = {
+    before: 'retry:\n  attempts: 3\n  delay_ms: 0          # retry immediately\n  jitter: false\n  budget: none         # no ceiling on total retries',
+    after:  'retry:\n  attempts: 2\n  backoff: exponential # 200ms, 400ms, ...\n  jitter: full         # randomise every delay\n  budget: 10%          # retries may add at most 10% load'
+  };
+  var pre = document.getElementById('code');
+  function tab(name) { pre.textContent = code[name]; document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === name)); }); }
+  document.querySelectorAll('.tabs button').forEach(function (b) { b.addEventListener('click', function () { tab(b.dataset.tab); }); });
+  tab('before');
+})();
+</script>
+</body>
+</html>

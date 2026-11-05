@@ -17,6 +17,7 @@ openplan (root)
 │   ├── plugin-codex/     → Codex CLI hook config (hooks.json only — skills ship via `openplan install codex`, not this folder)
 │   └── plugin-agy/       → Antigravity CLI (agy) plugin (hooks.json + minimal plugin.json)
 ├── packages/             → Shared React component packages
+│   ├── chrome/           → app chrome shared by openplan + opendocs: TopBar, Modal/Drawer/SlidePanel (animated), Button/Dropdown, SiteSwitcher, chrome.css (op-* primitives)
 │   ├── shared/
 │   ├── plan-viewer/
 │   ├── toolbar/
@@ -285,12 +286,22 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   "New version — view" button (it never switches versions under a reader). **In-process only**: one proxy
   instance; several instances would need a shared bus (Postgres LISTEN/NOTIFY / Redis). Tests that open streams
   must register `ts.Close` via `t.Cleanup` *before* the streams (else `httptest.Server.Close` hangs on them).
+- **No "Submit review".** `opendocs review` returns when the reviewer **closes the review tab** (no SSE viewer for 8 s after at
+  least one connected — `hub.onIdle` → `Server.Done()`); there is no submit endpoint. **Icons:** one library everywhere —
+  Hugeicons via `<Icon name>` in `@openplan/annotations` (toolbar re-exports it; no inline SVG/glyph icons in apps).
+  **Transitions:** `Modal`/`Drawer` play enter+exit animations (use `useDismiss`/`DismissButton` inside them), `SlidePanel`
+  animates side panels, `Dropdown` menus animate; all respect `prefers-reduced-motion`.
+- **Sample document:** `internal/opendocs/sample/retry-storm.html` is a self-contained interactive explainer (chart + slider,
+  checklist, tabs, light/dark) used by `opendocs demo`, `GET /api/sample`, the app's first-run button and the landing demo;
+  `TestSampleFollowsTheGuidelines` holds it to the guidelines. The landing demo runs the **real** `render/bridge.js` +
+  `render/bridge.css` (imported with `?raw`) in a sandboxed iframe.
 - **Local-mode sharing from the UI** (`server/publish.go`, local server only): `GET/POST /api/settings` (proxy URL, validated
   https-or-localhost), `GET /api/docs/{doc}/remote`, `POST .../publish` (head version → proxy; first time creates the
   remote doc, later adds a version), `POST .../remote/links {role}` (mints a fresh revocable link). State is keyed
   `doc:<project>/<slug>` in `~/.opendocs/state.json`; **the editor token never goes to the browser**.
-  UI (`apps/opendocs-ui/src/`): reuses openplan's chrome — `packages/shared/src/chrome.css` (op-* primitives extracted
-  verbatim from apps/ui, imported by both apps), the Hugeicons registry in `@openplan/annotations`, `SelectionToolbar`/
+  UI (`apps/opendocs-ui/src/`): reuses openplan's chrome — `@openplan/chrome` (`chrome.css` op-* primitives, `TopBar`, `Modal`/`Drawer`/`SlidePanel`,
+  `RailHeader` lives in `@openplan/annotations`); openplan's own TopBar, share drawer, side panels and comments header now use the
+  same components, so the two apps differ only in which actions/panels they offer, the Hugeicons registry in `@openplan/annotations`, `SelectionToolbar`/
   `CommentPopover`/`SuggestionPopover` from `@openplan/toolbar`. `components/`: `TopBar`, `LeftPanel` (outline from the
   bridge + documents + **local folders via the File System Access API**, imported as versions), `AnchoredRail` (cards
   sit at their highlight's document Y, from the bridge's `opendocs:layout`), `VersionHistoryModal`, `ShareDrawer`
@@ -369,8 +380,7 @@ binary, same as openplan.
 | `src/icons.tsx` | SVG icon components |
 
 The opendocs landing (`apps/opendocs-landing`) reuses **openplan's landing CSS and layout** (hero with agent chips +
-install box, trust strip, same buttons/nav) and adds: `DemoSection` (a working review UI built from the real
-`@openplan/toolbar` + `AnnoCard` components on a sample postmortem — select text to comment), `FlowSection` (numbered
+install box, trust strip, same buttons/nav) and adds: `DemoSection` (the real bridge + sample document in an iframe, with the real toolbar/`AnnoCard` components), `FlowSection` (numbered
 steps beside a terminal, no cards), `Features` (alternating rows separated by hairlines), `Faq`. Demo copy uses invented
 names and an invented incident; nothing is real usage data. No emoji in UI chrome (reactions are content).
 

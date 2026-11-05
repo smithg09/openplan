@@ -49,7 +49,7 @@ export const RequestChangesFlyup: React.FC<RequestChangesFlyupProps> = ({ onCanc
         <div className="op-grow" />
         <Button kind="ghost" size="md" onClick={onCancel}>cancel</Button>
         <Button kind="primary" size="md" onClick={() => onSend(text, includeEdits)}>
-          request changes →
+          request changes
         </Button>
       </div>
     </div>

@@ -12,6 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { EmptyState } from './components/EmptyState';
 import { RequestChangesFlyup } from './components/RequestChangesFlyup';
 import { ToastStack } from './components/Primitives';
+import { SlidePanel } from '@openplan/chrome';
 import { PlanEditor } from '@openplan/plan-viewer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { CommentRail } from '@openplan/annotations';
@@ -43,6 +44,18 @@ export default function App() {
   const [binVersion, setBinVersion] = React.useState('');
   const [author, setAuthorState] = React.useState<string>(() => getAuthor() ?? '');
   const [showIdentity, setShowIdentity] = React.useState(false);
+  const [leftOpen, setLeftOpen] = React.useState(true);
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '[') setLeftOpen(v => !v);
+      else if (e.key === ']') setPanelOpen(!useStore.getState().panelOpen);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [setPanelOpen]);
   const pendingAnnotationRef = React.useRef<Omit<Annotation, 'id' | 'createdAt' | 'resolved'> | null>(null);
 
   const handleAddAnnotation = (ann: Omit<Annotation, 'id' | 'createdAt' | 'resolved'>) => {
@@ -436,6 +449,9 @@ export default function App() {
       )}
 
       <TopBar
+        leftOpen={leftOpen} onToggleLeft={() => setLeftOpen(v => !v)}
+        panelOpen={panelOpen} onTogglePanel={() => setPanelOpen(!panelOpen)}
+        openComments={annotations.filter(a => !a.resolved).length}
         onShare={() => setShowShare(true)}
         onExport={fmt => {
           if (fmt === 'markdown') {
@@ -464,6 +480,7 @@ export default function App() {
       />
 
       <div className="op-app-body">
+        <SlidePanel open={leftOpen} side="left" width={220}>
         <OutlineFilesPanel
           plan={plan}
           mode={mode}
@@ -479,6 +496,7 @@ export default function App() {
             }
           }}
         />
+        </SlidePanel>
 
         {mode === 'standalone' && dirFiles.length > 0 && !selectedFile ? (
           <EmptyState />
@@ -494,7 +512,7 @@ export default function App() {
           />
         )}
 
-        {panelOpen && (
+        <SlidePanel open={panelOpen} side="right" width={340}>
           <CommentRail
             annotations={annotations}
             focusId={focusedAnnotationId}
@@ -520,7 +538,7 @@ export default function App() {
               );
             }}
           />
-        )}
+        </SlidePanel>
       </div>
 
       {mode === 'hook' && (
@@ -533,20 +551,6 @@ export default function App() {
         />
       )}
 
-      {!panelOpen && (
-        <button
-          onClick={() => setPanelOpen(true)}
-          style={{
-            position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)',
-            writingMode: 'vertical-rl', padding: '12px 6px',
-            background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRight: 'none',
-            borderRadius: '5px 0 0 5px', fontFamily: 'var(--font-mono)', fontSize: 10,
-            color: 'var(--text-muted)', cursor: 'pointer',
-          }}
-        >
-          annotations [{annotations.filter(a => !a.resolved).length}]
-        </button>
-      )}
 
       {showRequestChanges && (
         <RequestChangesFlyup

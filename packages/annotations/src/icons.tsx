@@ -9,7 +9,7 @@ import {
   UndoIcon, Copy01Icon, ViewIcon, ViewOffIcon, Alert02Icon,
   GitBranchIcon, Clock01Icon, FullScreenIcon, SidebarRightIcon, SidebarLeftIcon, PrinterIcon, KeyboardIcon,
   Upload04Icon, ArrowLeft01Icon, ArrowDown01Icon, FolderOpenIcon, Search01Icon, MoreHorizontalIcon,
-  FileExportIcon, PdfIcon, Add01Icon, Refresh01Icon, NotificationOff01Icon, Settings02Icon,
+  FileExportIcon, PdfIcon, Add01Icon, Refresh01Icon, NotificationOff01Icon, Settings02Icon, GithubIcon, ArrowRight01Icon,
 } from '@hugeicons/core-free-icons';
 
 export const ANNOTATION_TYPES: Record<string, { label: string; colorVar: string; letter: string }> = {
@@ -86,6 +86,9 @@ const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
   refresh: Refresh01Icon,
   notifications_off: NotificationOff01Icon,
   settings: Settings02Icon,
+  github: GithubIcon,
+  arrow_right: ArrowRight01Icon,
+  arrow_down: ArrowDown01Icon,
 };
 
 const SCALE = 1.05;

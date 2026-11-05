@@ -17,19 +17,13 @@ import (
 //go:embed bridge.js
 var bridgeJS string
 
+//go:embed bridge.css
+var bridgeCSS string
+
 // defaultStyle makes highlights visible even when the document ships no CSS for
-// them. Scoped to the bridge's class so it cannot clobber document styles.
-const defaultStyle = `<style id="opendocs-bridge-style">` +
-	`.opendocs-hl{cursor:pointer;border-radius:2px;transition:background .15s;` +
-	`background:rgba(167,139,250,.22);border-bottom:2px solid rgba(167,139,250,.75)}` +
-	`.opendocs-hl:hover{background:rgba(167,139,250,.34)}` +
-	`.opendocs-hl[data-type="question"]{background:rgba(56,189,248,.2);border-bottom-color:rgba(56,189,248,.8)}` +
-	`.opendocs-hl[data-type="suggestion"]{background:rgba(45,212,191,.2);border-bottom-color:rgba(45,212,191,.8)}` +
-	`.opendocs-hl[data-type="deletion"]{background:rgba(239,68,68,.16);border-bottom:0;text-decoration:line-through;text-decoration-color:rgba(239,68,68,.9)}` +
-	`.opendocs-hl[data-status="resolved"]{background:rgba(34,197,94,.12);border-bottom-color:rgba(34,197,94,.5);text-decoration:none}` +
-	`.opendocs-hl[data-status="orphaned"]{background:rgba(150,150,150,.18);border-bottom:0}` +
-	`html[data-opendocs-theme="dark"]{color-scheme:dark}html[data-opendocs-theme="light"]{color-scheme:light}` +
-	`</style>`
+// them. Scoped to the bridge's classes so it cannot clobber document styles. The
+// same file is imported by the marketing demo, so the two cannot drift.
+func defaultStyle() string { return `<style id="opendocs-bridge-style">` + bridgeCSS + `</style>` }
 
 // BridgeJS returns the embedded bridge source (used by tests and the server's
 // CSP accounting).
@@ -40,7 +34,7 @@ func BridgeJS() string { return bridgeJS }
 // the start of <head> (falling back to <html>, then the doctype, then the very
 // front) so it initializes before the document's own scripts can run.
 func Frame(userHTML []byte) []byte {
-	inject := defaultStyle + "<script>" + bridgeJS + "</script>"
+	inject := defaultStyle() + "<script>" + bridgeJS + "</script>"
 	return []byte(insertAfterOpening(string(userHTML), inject))
 }
 

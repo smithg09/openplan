@@ -140,6 +140,7 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.text();
   },
+  sample: () => req<{ slug: string; html: string }>('GET', '/api/sample'),
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),

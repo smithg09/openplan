@@ -195,6 +195,7 @@
       "dependencies": {
         "@hugeicons/core-free-icons": "^4.4.0",
         "@hugeicons/react": "^1.1.10",
+        "@openplan/annotations": "workspace:*",
       },
       "devDependencies": {
         "@types/react": "^18.3.17",
