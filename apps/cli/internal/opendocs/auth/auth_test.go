@@ -246,3 +246,22 @@ func TestGrantsCorruptFileFailsClosed(t *testing.T) {
 		t.Fatal("a corrupt grants file must deny access, not allow it")
 	}
 }
+
+func TestLoadOrCreateKeyPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d", "signing.key")
+	k1, err := LoadOrCreateKey(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	k2, err := LoadOrCreateKey(path)
+	if err != nil || string(k1) != string(k2) {
+		t.Fatalf("key must be stable across loads: %v", err)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("key file mode = %v, want 0600", info.Mode().Perm())
+	}
+	os.WriteFile(path, []byte("short"), 0o600)
+	if _, err := LoadOrCreateKey(path); err == nil {
+		t.Error("a truncated key file must be an error, not silently regenerated")
+	}
+}

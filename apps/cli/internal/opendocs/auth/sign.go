@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -66,4 +68,37 @@ func (s *Signer) Verify(doc, version, sig string, now time.Time) bool {
 		return false
 	}
 	return hmac.Equal(got, s.mac(doc, version, exp))
+}
+
+// LoadOrCreateKey returns the signing key stored at path, creating it (0600)
+// on first use so signed frame URLs survive a restart.
+func LoadOrCreateKey(path string) ([]byte, error) {
+	if b, err := os.ReadFile(path); err == nil {
+		if len(b) < 16 {
+			return nil, fmt.Errorf("auth: signing key file %s is too short", path)
+		}
+		return b, nil
+	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+	key, err := NewRandomKey()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	// O_EXCL: if two processes race, one wins and the other re-reads.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if os.IsExist(err) {
+		return LoadOrCreateKey(path)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := f.Write(key); err != nil {
+		return nil, err
+	}
+	return key, nil
 }
