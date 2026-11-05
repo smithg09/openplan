@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/smithg09/openplan/cli/internal/opendocs/remote"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -51,6 +52,7 @@ func TestPublishFeedbackRoundTrip(t *testing.T) {
 	ts, _ := proxyServer(t)
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("OPENDOCS_PROXY", "")
+	noHosted(t)
 	file := filepath.Join(t.TempDir(), "report.html")
 	os.WriteFile(file, []byte("<html><body><p>hello world</p></body></html>"), 0o644)
 
@@ -115,4 +117,12 @@ func TestFeedbackNeedsPublishedFile(t *testing.T) {
 	if _, err := runCLI(t, "feedback", filepath.Join(t.TempDir(), "nope.html")); err == nil || !strings.Contains(err.Error(), "has not been published") {
 		t.Fatalf("got %v", err)
 	}
+}
+
+// noHosted blanks the built-in hosted default so tests exercise the "nothing configured" paths.
+func noHosted(t *testing.T) {
+	t.Helper()
+	saved := remote.HostedURL
+	remote.HostedURL = ""
+	t.Cleanup(func() { remote.HostedURL = saved })
 }

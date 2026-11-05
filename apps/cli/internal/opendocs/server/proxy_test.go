@@ -430,3 +430,45 @@ func TestRestoreAndRawRoles(t *testing.T) {
 		t.Errorf("raw without token = %d, want 401", got)
 	}
 }
+
+func TestCORSAllowListOnly(t *testing.T) {
+	key, _ := auth.NewRandomKey()
+	signer, _ := auth.NewSigner(key)
+	grants := auth.NewFileGrants(filepath.Join(t.TempDir(), "g.json"))
+	build := func(origins ...string) http.Handler {
+		return NewProxy(store.NewWithBase(t.TempDir()).Backend(), grants, signer, "t").WithCORS(origins).Handler()
+	}
+	req := func(h http.Handler, method, origin string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "/api/docs", nil)
+		if origin != "" {
+			r.Header.Set("Origin", origin)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	const app = "https://opendocs.smithgajjar.dev"
+
+	h := build(app+"/", "*", "")
+	if w := req(h, "OPTIONS", app); w.Code != 204 || w.Header().Get("Access-Control-Allow-Origin") != app ||
+		!strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
+		t.Errorf("preflight from the allowed origin = %d %v", w.Code, w.Header())
+	}
+	w := req(h, "GET", app)
+	if w.Header().Get("Access-Control-Allow-Origin") != app || w.Header().Get("Access-Control-Allow-Credentials") != "" {
+		t.Errorf("allowed origin must be echoed, never with credentials: %v", w.Header())
+	}
+	if w := req(h, "GET", "https://evil.example"); w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("an origin outside the allow-list must get no CORS headers")
+	}
+	if w := req(h, "OPTIONS", "https://evil.example"); w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("preflight from a stranger must not be approved")
+	}
+	// "*" in the list is ignored (no wildcard), and with no list there are no headers at all.
+	if w := req(build("*"), "GET", "https://anything.example"); w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("wildcard origin must not be honoured")
+	}
+	if w := req(build(), "GET", app); w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Error("CORS is off unless configured")
+	}
+}

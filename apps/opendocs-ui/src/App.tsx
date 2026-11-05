@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
-import { api, captureToken, docFromPath, frameURL, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
+import { api, bootstrap, captureToken, docFromPath, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
 import { TopBar } from './components/TopBar';
 import { LeftPanel, type Heading } from './components/LeftPanel';
@@ -37,7 +37,6 @@ export default function App() {
   const [versions, setVersions] = React.useState<ApiVersion[]>([]);
   const [currentVersionId, setCurrentVersionId] = React.useState('');
   const [comments, setComments] = React.useState<ApiComment[]>([]);
-  const [frameSrc, setFrameSrc] = React.useState('');
   const [frameHtml, setFrameHtml] = React.useState('');
   const [layout, setLayout] = React.useState<{ scrollTop: number; scrollHeight: number; anchors: Record<string, number>; headings: Heading[] }>({ scrollTop: 0, scrollHeight: 0, anchors: {}, headings: [] });
   const [sel, setSel] = React.useState<{ anchor: ApiAnchor; rect: Rect } | null>(null);
@@ -119,7 +118,7 @@ export default function App() {
   React.useEffect(() => {
     (async () => {
       try {
-        const session = await api.session();
+        const session = await bootstrap();
         setMode(session.mode);
         let doc = session.focus;
         if (session.mode === 'proxy') {
@@ -141,26 +140,18 @@ export default function App() {
     })();
   }, [openDoc]);
 
-  // The iframe can't send Authorization, so proxy mode uses a short-lived signed URL;
-  // the HTML is fetched as text and given to the sandbox as srcdoc (no iframe request).
+  // The sandboxed iframe never makes a request of its own: the page fetches the
+  // (bridge-injected) HTML as text — with the bearer token where needed — and hands
+  // it over as srcdoc. In the hosted web app, browser-local documents are built in place.
   React.useEffect(() => {
     if (!docSlug || !currentVersionId) return;
-    if (mode !== 'proxy') { setFrameSrc(frameURL(docSlug, currentVersionId)); return; }
-    let live = true;
-    api.frameUrl(docSlug, currentVersionId).then((r) => live && setFrameSrc(r.url)).catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
-    return () => { live = false; };
-  }, [mode, docSlug, currentVersionId]);
-
-  React.useEffect(() => {
-    if (!frameSrc) return;
     let live = true;
     setFrameHtml('');
-    fetch(frameSrc)
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`document failed to load (${r.status})`))))
+    api.frameHtml(docSlug, currentVersionId)
       .then((t) => live && setFrameHtml(t))
       .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
     return () => { live = false; };
-  }, [frameSrc]);
+  }, [docSlug, currentVersionId]);
 
   // ── bridge ──────────────────────────────────────────────────────────────────
   const repaint = React.useCallback((list: ApiComment[]) => {

@@ -1,3 +1,5 @@
+import { DEFAULT_PROXY, WEB } from './env';
+
 // Typed client for the opendocs local server. Types mirror the Go JSON exactly
 // (note the anchor uses start/end, not the shared type's startOffset/endOffset);
 // conversion to the shared comment shape happens in adapt.ts.
@@ -66,7 +68,7 @@ const tokenKey = (doc: string) => `opendocs:token:${doc}`;
 
 /** Doc id from a /d/<id> path, or '' (local mode). */
 export function docFromPath(): string {
-  const m = /^\/d\/([^/]+)/.exec(window.location.pathname);
+  const m = /\/d\/([^/]+)/.exec(window.location.pathname); // /d/<id> (proxy) or /app/d/<id> (web app)
   return m ? decodeURIComponent(m[1]) : '';
 }
 
@@ -83,6 +85,16 @@ export function loadToken(doc: string): void {
   activeToken = doc ? sessionStorage.getItem(tokenKey(doc)) ?? '' : '';
 }
 
+// Where the HTTP API lives. '' = same origin (the Go server or a proxy serving this
+// UI). In the hosted web app a shared document is read from a proxy origin.
+let apiBase = '';
+export function setApiBase(base: string): void { apiBase = base.replace(/\/$/, ''); }
+export function shareOrigin(): string { return apiBase || window.location.origin; }
+const resolve = (p: string) => apiBase + p;
+
+let httpMode: 'local' | 'proxy' = 'local';
+let liveEnabled = true;
+
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   // The server rejects any write that isn't application/json (this forces a CORS
   // preflight for cross-origin callers), so send it on every non-GET — even
@@ -90,7 +102,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') headers['Content-Type'] = 'application/json';
   if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
-  const res = await fetch(url, {
+  const res = await fetch(resolve(url), {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -107,8 +119,16 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const api = {
-  session: () => req<ApiSession>('GET', '/api/session'),
+export const httpApi = {
+  session: async () => { const s = await req<ApiSession>('GET', '/api/session'); httpMode = s.mode; return s; },
+  /** Bridge-injected HTML for the sandbox. Fetched as text: the iframe never makes its own request. */
+  frameHtml: async (doc: string, versionId: string): Promise<string> => {
+    let path = frameURL(doc, versionId);
+    if (httpMode === 'proxy') path = (await req<{ url: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame-url`)).url;
+    const res = await fetch(resolve(path));
+    if (!res.ok) throw new Error(`document failed to load (${res.status})`);
+    return res.text();
+  },
   access: (doc: string) => req<{ role: Role }>('GET', `/api/docs/${encodeURIComponent(doc)}/access`),
   frameUrl: (doc: string, versionId: string) =>
     req<{ url: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame-url`),
@@ -136,7 +156,7 @@ export const api = {
   rawVersion: async (doc: string, id: string): Promise<string> => {
     const headers: Record<string, string> = {};
     if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
-    const res = await fetch(`/api/docs/${encodeURIComponent(doc)}/versions/${id}/raw`, { headers });
+    const res = await fetch(resolve(`/api/docs/${encodeURIComponent(doc)}/versions/${id}/raw`), { headers });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     return res.text();
   },
@@ -171,12 +191,13 @@ export type LiveEvent = { type: 'comments' | 'versions' | 'presence'; count?: nu
  * until `signal` aborts. Returns once aborted.
  */
 export async function subscribe(doc: string, onEvent: (e: LiveEvent) => void, signal: AbortSignal): Promise<void> {
+  if (!liveEnabled) return; // browser-local documents have no other viewers
   let delay = 1000;
   while (!signal.aborted) {
     try {
       const headers: Record<string, string> = { Accept: 'text/event-stream' };
       if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
-      const res = await fetch(`/api/docs/${encodeURIComponent(doc)}/events`, { headers, signal });
+      const res = await fetch(resolve(`/api/docs/${encodeURIComponent(doc)}/events`), { headers, signal });
       if (res.status === 401 || res.status === 403) return; // not allowed: don't retry
       if (!res.ok || !res.body) throw new Error(String(res.status));
       delay = 1000;
@@ -201,4 +222,40 @@ export async function subscribe(doc: string, onEvent: (e: LiveEvent) => void, si
     await new Promise((r) => setTimeout(r, delay));
     delay = Math.min(delay * 2, 15000);
   }
+}
+
+// ── backend switch ──────────────────────────────────────────────────────────
+// The UI talks to `api`. It is the HTTP client by default; the hosted web app
+// swaps in a browser-local store for documents that live only on this device.
+export type Api = typeof httpApi;
+let impl: Api = httpApi;
+export const api: Api = new Proxy({} as Api, { get: (_t, k) => (impl as unknown as Record<string | symbol, unknown>)[k] });
+
+/**
+ * Decide where this page's data comes from and return the session.
+ *  - server build (Go local server or a proxy's own UI): same-origin HTTP.
+ *  - web build, /d/<id> link: a proxy, over HTTP with CORS (?proxy= or the hosted default).
+ *  - web build, anything else: documents stored in this browser.
+ */
+export async function bootstrap(): Promise<ApiSession> {
+  if (!WEB) return httpApi.session();
+  const q = new URLSearchParams(window.location.search);
+  if (docFromPath()) {
+    setApiBase(normalizeProxy(q.get('proxy') || DEFAULT_PROXY));
+    return httpApi.session();
+  }
+  const { webLocalApi } = await import('./webstore');
+  impl = webLocalApi;
+  liveEnabled = false;
+  return { project: 'browser', focus: q.get('doc') ?? '', version: 'web', mode: 'local' };
+}
+
+/** Accept https (or http on localhost) and return the bare origin. */
+export function normalizeProxy(raw: string): string {
+  let u: URL;
+  try { u = new URL(raw.trim()); } catch { throw new Error(`invalid proxy URL: ${raw}`); }
+  const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+  if (u.protocol !== 'https:' && !(local && u.protocol === 'http:')) throw new Error('the proxy URL must be https (http is only allowed for localhost)');
+  if (u.username || u.password) throw new Error('credentials in the proxy URL are not allowed');
+  return u.origin;
 }

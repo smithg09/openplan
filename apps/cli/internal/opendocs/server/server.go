@@ -42,13 +42,14 @@ type Server struct {
 	version string
 
 	// Proxy mode (nil/unset for the local server): see access.go.
-	grants   auth.Grants
-	signer   *auth.Signer
-	hub      *hub
-	state    *remote.State // local mode: proxy setting + what was published where
-	limits   Limits
-	createRL *rateLimiter
-	writeRL  *rateLimiter
+	grants      auth.Grants
+	signer      *auth.Signer
+	hub         *hub
+	corsOrigins map[string]bool
+	state       *remote.State // local mode: proxy setting + what was published where
+	limits      Limits
+	createRL    *rateLimiter
+	writeRL     *rateLimiter
 
 	httpSrv *http.Server
 
@@ -110,7 +111,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.guard(auth.ActModifyOwn, s.handleDeleteComment))
 
 	mux.Handle("/", s.uiHandler())
-	return withDocID(s.limitWrites(guardWrites(mux)))
+	return s.cors(withDocID(s.limitWrites(guardWrites(mux))))
 }
 
 // maxBodyBytes caps request bodies (a document version is the largest payload).

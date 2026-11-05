@@ -88,16 +88,27 @@
     return range;
   }
 
-  // Map a DOM Range to a global [start,end) offset pair.
+  // Map a DOM Range to a global [start,end) offset pair. A range's boundaries are
+  // often *elements* — a triple-click ends at offset 0 of the next block — so we
+  // intersect the range with every indexed text node instead of expecting both
+  // boundaries to be text nodes.
   function rangeToOffsets(index, range) {
     var start = -1,
       end = -1;
     for (var i = 0; i < index.segments.length; i++) {
       var seg = index.segments[i];
-      if (seg.node === range.startContainer) start = seg.start + range.startOffset;
-      if (seg.node === range.endContainer) end = seg.start + range.endOffset;
+      var node = seg.node;
+      var len = node.nodeValue.length;
+      var s = range.comparePoint(node, 0); // -1: node starts before the range, 0: inside, 1: after
+      var e = range.comparePoint(node, len);
+      if (e < 0 || s > 0) continue; // wholly before or after the range
+      var from = s < 0 ? range.startOffset : 0; // range starts inside this node
+      var to = e > 0 ? range.endOffset : len; // range ends inside this node
+      if (to <= from) continue;
+      if (start < 0) start = seg.start + from;
+      end = seg.start + to;
     }
-    if (start < 0 || end < 0 || end < start) return null;
+    if (start < 0 || end <= start) return null;
     return { start: start, end: end };
   }
 

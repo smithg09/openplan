@@ -36,8 +36,15 @@ func TestShareURLKeepsTokenInFragment(t *testing.T) {
 func TestStateProxyResolution(t *testing.T) {
 	st := NewStateAt(filepath.Join(t.TempDir(), "s", "state.json"))
 	t.Setenv("OPENDOCS_PROXY", "")
+	saved := HostedURL
+	t.Cleanup(func() { HostedURL = saved })
+	HostedURL = ""
 	if _, err := st.Proxy(""); !errors.Is(err, ErrNoProxy) {
 		t.Fatalf("want ErrNoProxy, got %v", err)
+	}
+	HostedURL = "https://hosted.example.com"
+	if p, _ := st.Proxy(""); p != "https://hosted.example.com" {
+		t.Fatalf("with nothing configured the hosted default applies, got %q", p)
 	}
 	st.SetProxy("https://cfg.example.com")
 	if p, _ := st.Proxy(""); p != "https://cfg.example.com" {

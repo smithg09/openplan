@@ -52,6 +52,7 @@ bun run build:cli            # Build Go binary → bin/openplan
 bun run build                # Build UI + CLI (UI first, then CLI)
 bun run build:opendocs-ui    # Build opendocs host UI → apps/cli/internal/opendocs/server/ui/dist/
 bun run build:opendocs       # Build Go binary → bin/opendocs
+bun run build:opendocs-web   # Hosted web build of opendocs-ui → apps/opendocs-landing/dist/app (run after build:opendocs-landing, which empties dist/)
 bun run build:docs           # opendocs UI + binary (UI first)
 bun run dev:opendocs-ui      # Vite dev server for opendocs UI (proxies /api → :7433; run `opendocs serve --port 7433`)
 bun run dev:ui               # Vite dev server for main UI (port 5173, proxies /api → :7432)
@@ -295,6 +296,15 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   checklist, tabs, light/dark) used by `opendocs demo`, `GET /api/sample`, the app's first-run button and the landing demo;
   `TestSampleFollowsTheGuidelines` holds it to the guidelines. The landing demo runs the **real** `render/bridge.js` +
   `render/bridge.css` (imported with `?raw`) in a sandboxed iframe.
+- **Hosted web app (`opendocs.smithgajjar.dev/app`).** Same `opendocs-ui`, built with `VITE_WEB=true` (`base /app/`, output into the
+  landing's `dist/app`; `.github/workflows/opendocs-site.yml` builds landing then web, `public/_redirects` gives `/app/d/*` SPA
+  routing). `api.ts` is a switchable client: `bootstrap()` picks same-origin HTTP (Go server / proxy UI), HTTP to a proxy for a
+  `/app/d/<id>?proxy=…#t=…` link (`DEFAULT_PROXY`, `VITE_DEFAULT_PROXY`), or `webstore.ts` — documents, versions and comments in
+  **IndexedDB**, the sample seeded on first visit, publish/links via fetch to the proxy. There is no server, so a published doc's
+  **editor token lives in this browser's storage**. The page builds the sandbox HTML itself (`frame.ts`, same bridge via `?raw`).
+  The proxy must opt in: `--cors-origin`/`$OPENDOCS_CORS_ORIGINS` is an exact-origin allow-list (no wildcard, no credentials);
+  render.yaml sets it. `remote.HostedURL` (Go) and `DEFAULT_PROXY` (web) default to `https://opendocs-proxy.onrender.com` — the URL
+  render.yaml implies; change both if you deploy elsewhere.
 - **Local-mode sharing from the UI** (`server/publish.go`, local server only): `GET/POST /api/settings` (proxy URL, validated
   https-or-localhost), `GET /api/docs/{doc}/remote`, `POST .../publish` (head version → proxy; first time creates the
   remote doc, later adds a version), `POST .../remote/links {role}` (mints a fresh revocable link). State is keyed

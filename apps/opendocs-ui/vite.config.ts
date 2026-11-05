@@ -6,9 +6,11 @@ import { readFileSync } from 'fs'
 const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, './package.json'), 'utf-8'))
 
 const isGitHubPages = process.env.VITE_GITHUB_PAGES === 'true'
+// Hosted web app: static build served at opendocs.smithgajjar.dev/app/ (no Go server).
+const isWeb = process.env.VITE_WEB === 'true'
 
 export default defineConfig({
-  base: isGitHubPages ? '/opendocs-app/' : '/',
+  base: isWeb ? '/app/' : isGitHubPages ? '/opendocs-app/' : '/',
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
@@ -23,8 +25,10 @@ export default defineConfig({
   build: {
     // Emit straight into the Go embed dir. emptyOutDir:false preserves the
     // tracked .gitkeep; the build script clears stale assets beforehand.
-    outDir: '../cli/internal/opendocs/server/ui/dist',
-    emptyOutDir: false,
+    // Server build: straight into the Go embed dir (emptyOutDir:false keeps the tracked
+    // .gitkeep; the build script clears stale assets). Web build: into the landing site.
+    outDir: isWeb ? '../opendocs-landing/dist/app' : '../cli/internal/opendocs/server/ui/dist',
+    emptyOutDir: isWeb,
   },
   server: {
     // `opendocs serve --port 7433` for a proxyable dev backend.

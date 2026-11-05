@@ -36,7 +36,6 @@ func SetVersion(v string) {
 	cliVersion = v
 }
 
-
 func init() {
 	rootCmd.PersistentFlags().StringVar(&browserFlag, "browser", "", "Override which browser to open")
 	rootCmd.AddCommand(contextCmd)

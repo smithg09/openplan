@@ -27,6 +27,7 @@ func TestLocalSettingsProxy(t *testing.T) {
 	s, _, _ := localWithProxy(t)
 	h := s.Handler()
 	t.Setenv("OPENDOCS_PROXY", "")
+	noHosted(t)
 
 	if w := do(t, h, "GET", "/api/settings", nil); !strings.Contains(w.Body.String(), `"proxy":""`) {
 		t.Errorf("unset proxy = %s", w.Body)
@@ -49,6 +50,7 @@ func TestLocalPublishAndShareFlow(t *testing.T) {
 	s, ts, st := localWithProxy(t)
 	h := s.Handler()
 	t.Setenv("OPENDOCS_PROXY", "")
+	noHosted(t)
 
 	// Before publishing: not published, links refused, publish needs a proxy.
 	if w := do(t, h, "GET", "/api/docs/report/remote", nil); !strings.Contains(w.Body.String(), `"published":false`) {
@@ -119,4 +121,12 @@ func TestPublishRoutesAbsentInProxyMode(t *testing.T) {
 	if w := e.call(editor, "POST", "/api/docs/"+doc+"/publish", map[string]string{}); strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") {
 		t.Errorf("the proxy must not expose local publish: %s", w.Body)
 	}
+}
+
+// noHosted blanks the built-in hosted default so tests exercise the "nothing configured" paths.
+func noHosted(t *testing.T) {
+	t.Helper()
+	saved := remote.HostedURL
+	remote.HostedURL = ""
+	t.Cleanup(func() { remote.HostedURL = saved })
 }

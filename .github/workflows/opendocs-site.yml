@@ -5,7 +5,7 @@ name: Deploy opendocs site (Cloudflare Pages)
 on:
   push:
     branches: [main]
-    paths: ["apps/opendocs-landing/**", "packages/shared/**", ".github/workflows/opendocs-site.yml"]
+    paths: ["apps/opendocs-landing/**", "apps/opendocs-ui/**", "packages/**", "apps/cli/internal/opendocs/render/**", "apps/cli/internal/opendocs/sample/**", ".github/workflows/opendocs-site.yml"]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +20,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build:opendocs-landing
+      # The hosted web app lives at /app/ inside the same site (built after the landing, which empties dist/).
+      - run: bun run build:opendocs-web
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

@@ -1,5 +1,5 @@
 import React from 'react';
-import { api, type ApiShare, type Role } from '../api';
+import { api, shareOrigin, type ApiShare, type Role } from '../api';
 import { Button, CopyButton, Drawer, Icon, useDismiss } from './ui';
 
 const ROLE_HELP: Record<Role, string> = {
@@ -141,7 +141,7 @@ function LocalShare({ doc, onOpenSettings }: { doc: string; onOpenSettings: () =
 
 const Inner: React.FC<{ mode: 'local' | 'proxy'; doc: string; onOpenSettings: () => void }> = ({ mode, doc, onOpenSettings }) => {
   const dismiss = useDismiss();
-  return mode === 'proxy' ? <ProxyShare doc={doc} origin={window.location.origin} /> : <LocalShare doc={doc} onOpenSettings={() => { dismiss(); setTimeout(onOpenSettings, 180); }} />;
+  return mode === 'proxy' ? <ProxyShare doc={doc} origin={shareOrigin()} /> : <LocalShare doc={doc} onOpenSettings={() => { dismiss(); setTimeout(onOpenSettings, 180); }} />;
 };
 
 export const ShareDrawer: React.FC<{ mode: 'local' | 'proxy'; doc: string; onClose: () => void; onOpenSettings: () => void }> = ({ mode, doc, onClose, onOpenSettings }) => (

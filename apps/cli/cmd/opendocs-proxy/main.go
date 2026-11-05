@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,6 +40,7 @@ var (
 	storeKind   string
 	databaseURL string
 	limits      = server.DefaultLimits()
+	corsOrigins []string
 )
 
 var rootCmd = &cobra.Command{
@@ -54,10 +56,21 @@ func init() {
 	rootCmd.Flags().StringVar(&addr, "addr", defaultAddr(), "listen address (use 0.0.0.0:PORT to expose; put TLS in front). Defaults to 0.0.0.0:$PORT when PORT is set")
 	rootCmd.Flags().IntVar(&limits.CreatePerHour, "create-per-hour", limits.CreatePerHour, "max new documents per client IP per hour (0 = unlimited)")
 	rootCmd.Flags().IntVar(&limits.WritePerMin, "writes-per-min", limits.WritePerMin, "max other writes per client IP per minute (0 = unlimited)")
+	rootCmd.Flags().StringSliceVar(&corsOrigins, "cors-origin", splitEnv("OPENDOCS_CORS_ORIGINS"), "allow this exact origin to call the API from a browser (repeatable; e.g. https://opendocs.smithgajjar.dev). Default $OPENDOCS_CORS_ORIGINS, comma-separated")
 	rootCmd.Flags().BoolVar(&limits.TrustProxy, "trust-proxy", false, "take client IP from the last X-Forwarded-For hop (only behind your own reverse proxy)")
 	rootCmd.Flags().StringVar(&storeKind, "store", "sqlite", "document storage: sqlite (default), postgres, or fs (plain files)")
 	rootCmd.Flags().StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "PostgreSQL connection URL for --store postgres (default $DATABASE_URL)")
 	rootCmd.Flags().StringVar(&dataDir, "data", defaultDataDir(), "directory for documents, grants and the signing key")
+}
+
+func splitEnv(name string) []string {
+	var out []string
+	for _, p := range strings.Split(os.Getenv(name), ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func defaultAddr() string {
@@ -128,7 +141,7 @@ func run(cmd *cobra.Command, _ []string) error {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.NewProxy(st, grants, signer, version).WithLimits(limits).Handler(),
+		Handler:           server.NewProxy(st, grants, signer, version).WithLimits(limits).WithCORS(corsOrigins).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,

@@ -19,9 +19,11 @@ import (
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
 
-// HostedURL is the default hosted proxy. Empty until one is deployed; when it
-// is set, publishing falls back to it only when the user has not chosen a proxy.
-const HostedURL = ""
+// HostedURL is the default hosted proxy: publishing falls back to it when the
+// user has not chosen a proxy. It is the URL the repo's render.yaml deploys to
+// (https://<service name>.onrender.com); change it if you deploy elsewhere. It is
+// a variable only so tests can blank it.
+var HostedURL = "https://opendocs-proxy.onrender.com"
 
 // ErrNoProxy means no proxy is configured and there is no hosted default.
 var ErrNoProxy = errors.New("no proxy configured (use --proxy, $OPENDOCS_PROXY, or `opendocs config proxy <url>`)")
