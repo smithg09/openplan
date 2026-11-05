@@ -26,6 +26,7 @@ export default function App() {
   const [mode, setMode] = React.useState<'local' | 'proxy'>('local');
   const [role, setRole] = React.useState<Role>('editor');
   const [frameSrc, setFrameSrc] = React.useState('');
+  const [frameHtml, setFrameHtml] = React.useState('');
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const me = React.useMemo(() => localAuthor(), []);
@@ -92,6 +93,21 @@ export default function App() {
       .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
     return () => { live = false; };
   }, [mode, docSlug, currentVersionId]);
+
+  // Load the (bridge-injected) HTML as text and give it to the iframe as srcdoc.
+  // This keeps the doc in an opaque-origin sandbox without the iframe making its
+  // own network request — some embedders (incl. Claude's preview pane) block
+  // requests from sandboxed subframes (ERR_BLOCKED_BY_CLIENT).
+  React.useEffect(() => {
+    if (!frameSrc) return;
+    let live = true;
+    setFrameHtml('');
+    fetch(frameSrc)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`document failed to load (${r.status})`))))
+      .then((t) => live && setFrameHtml(t))
+      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => { live = false; };
+  }, [frameSrc]);
 
   const canComment = role === 'commenter' || role === 'editor';
 
@@ -228,13 +244,13 @@ export default function App() {
 
       <div className="od-body">
         <div className="od-doc-pane">
-          {currentVersionId && frameSrc && (
+          {currentVersionId && frameHtml && (
             <iframe
               key={currentVersionId}
               ref={iframeRef}
               className="od-frame"
               sandbox="allow-scripts"
-              src={frameSrc}
+              srcDoc={frameHtml}
               title="document"
             />
           )}

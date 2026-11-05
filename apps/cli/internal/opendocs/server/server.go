@@ -228,12 +228,16 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing, invalid or expired frame signature", http.StatusUnauthorized)
 		return
 	}
-	// Only serve this into an <iframe>. Opened directly (a top-level navigation),
-	// the agent's HTML would run same-origin with the API and could read/write
-	// comments. Browsers set Sec-Fetch-Dest and pages cannot forge it; non-browser
-	// clients (curl, tests) omit it and are not a web threat, so they pass.
-	if dest := r.Header.Get("Sec-Fetch-Dest"); dest != "" && dest != "iframe" {
-		http.Error(w, "frame is only served into an iframe", http.StatusForbidden)
+	// Never serve this as a top-level page. Opened directly (a navigation), the
+	// agent's HTML would run same-origin with the API and could read/write
+	// comments. The UI fetch()es it (Sec-Fetch-Dest: empty) and hands it to a
+	// sandboxed srcdoc iframe; a direct iframe load is also fine. Browsers set
+	// Sec-Fetch-Dest and pages cannot forge it; non-browser clients (curl, tests)
+	// omit it and are not a web threat, so they pass.
+	switch r.Header.Get("Sec-Fetch-Dest") {
+	case "", "empty", "iframe":
+	default:
+		http.Error(w, "frame is not served as a page", http.StatusForbidden)
 		return
 	}
 	content, err := s.doc(r).ReadVersion(r.PathValue("id"))

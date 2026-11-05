@@ -223,6 +223,12 @@ func TestFrameRefusesDirectNavigation(t *testing.T) {
 	} else if w.Header().Get("X-Frame-Options") != "SAMEORIGIN" {
 		t.Errorf("iframe response missing X-Frame-Options: SAMEORIGIN")
 	}
+	if w := get("empty"); w.Code != http.StatusOK {
+		t.Errorf("fetch() by the host UI: want 200, got %d", w.Code)
+	}
+	if w := get("object"); w.Code != http.StatusForbidden {
+		t.Errorf("<object> embed: want 403, got %d", w.Code)
+	}
 	if w := get(""); w.Code != http.StatusOK {
 		t.Errorf("non-browser client (no Sec-Fetch-Dest): want 200, got %d", w.Code)
 	}

@@ -269,10 +269,12 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
 - Not done yet: Postgres (PR 4), rate limits / size quotas for the public hosted instance (PR 4), TLS (put a
   reverse proxy in front), folders/labels/search.
 
-**Unverified:** there is deliberately no `Content-Security-Policy: sandbox` header on `/frame`. An
-early attempt with it gave `net::ERR_BLOCKED_BY_CLIENT` in the Claude preview pane, but the error
-persisted after removing the header, so the cause was never isolated and it has **not** been tested
-in stock Chromium. If it turns out to work there, adding it back is belt-and-braces.
+**Rendering finding (verified):** Claude's preview pane blocks the *network request* of a sandboxed
+(opaque-origin) iframe with `net::ERR_BLOCKED_BY_CLIENT`; same URL in a non-sandboxed or
+`allow-same-origin` iframe loads, and `srcdoc` works. So opendocs-ui `fetch()`es the frame HTML and sets it
+as the iframe's `srcdoc` (sandbox `allow-scripts` only). `/frame` therefore accepts `Sec-Fetch-Dest`
+`empty`/`iframe`/absent and refuses everything else (e.g. `document`). Still no
+`Content-Security-Policy: sandbox` header (untested in stock Chromium).
 
 **Gotchas:** the API/store anchor uses `start`/`end`; the shared `CommentAnchor` uses
 `startOffset`/`endOffset` — conversion lives only in `apps/opendocs-ui/src/adapt.ts`. opendocs-ui
