@@ -5,7 +5,7 @@ name: Deploy opendocs site (Cloudflare Pages)
 on:
   push:
     branches: [main]
-    paths: ["apps/opendocs-site/**", ".github/workflows/opendocs-site.yml"]
+    paths: ["apps/opendocs-landing/**", "packages/shared/**", ".github/workflows/opendocs-site.yml"]
   workflow_dispatch:
 
 permissions:
@@ -17,9 +17,12 @@ jobs:
     if: ${{ vars.OPENDOCS_SITE_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build:opendocs-landing
       - name: Publish to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/opendocs-site --project-name=opendocs
+          command: pages deploy apps/opendocs-landing/dist --project-name=opendocs

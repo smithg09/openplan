@@ -11,6 +11,7 @@ openplan (root)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
 │   ├── opendocs-ui/      → React + Vite host UI for the `opendocs` binary (plain CSS + tokens, no Tailwind)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
+│   ├── opendocs-landing/ → React + Vite marketing site for opendocs (vanilla CSS; deploys to Cloudflare Pages)
 │   ├── plugin/           → Claude Code plugin (hooks + slash commands)
 │   ├── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json + commands/)
 │   ├── plugin-codex/     → Codex CLI hook config (hooks.json only — skills ship via `openplan install codex`, not this folder)
@@ -45,6 +46,7 @@ openplan (root)
 bun install                  # Install all workspace dependencies
 bun run build:ui             # Build main UI → apps/cli/internal/server/ui/dist/
 bun run build:landing        # Build landing page → apps/landing-page/dist/
+bun run build:opendocs-landing # Build opendocs marketing site → apps/opendocs-landing/dist/ (public/open/ = deep-link page)
 bun run build:cli            # Build Go binary → bin/openplan
 bun run build                # Build UI + CLI (UI first, then CLI)
 bun run build:opendocs-ui    # Build opendocs host UI → apps/cli/internal/opendocs/server/ui/dist/
@@ -273,7 +275,7 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
   X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
 - **Hosted deploy:** `Dockerfile.opendocs-proxy` + `render.yaml` (Render web service + Postgres; not yet
-  deployed — needs the user's Render account). `apps/opendocs-site/` is a static site for Cloudflare Pages
+  deployed — needs the user's Render account). `apps/opendocs-landing/` (React+Vite, vanilla CSS, own sapphire `tokens.css`) is the marketing site for Cloudflare Pages
   (`.github/workflows/opendocs-site.yml`, needs `CLOUDFLARE_*` secrets and repo var `OPENDOCS_SITE_ENABLED=true`)
   including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
   destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
@@ -327,6 +329,8 @@ binary, same as openplan.
 | `src/components/` | Hero, Nav, FeaturesSection, DemoSection, PageAnnotator, etc. |
 | `src/tokens.css` | Design tokens (separate from main UI) |
 | `src/icons.tsx` | SVG icon components |
+
+Both marketing navs render `SiteSwitcher` from `@openplan/shared` (`packages/shared/src/SiteSwitcher.tsx`): a hover/focus/click dropdown on the product name that links openplan ⇄ opendocs. Add a product to `SITES` there and both navs pick it up.
 
 ### Plugin (`apps/plugin/`)
 
