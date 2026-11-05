@@ -60,9 +60,43 @@ func (s *subscriber) take() []string {
 type hub struct {
 	mu   sync.Mutex
 	subs map[string]map[*subscriber]struct{}
+
+	// Idle detection: onIdle fires once the last viewer has been gone for
+	// `grace` after at least one had connected. `opendocs review` uses it as
+	// "the reviewer closed the tab", so no Submit button is needed.
+	everJoined bool
+	total      int
+	grace      time.Duration
+	idleTimer  *time.Timer
+	onIdle     func()
 }
 
-func newHub() *hub { return &hub{subs: map[string]map[*subscriber]struct{}{}} }
+func newHub() *hub { return &hub{subs: map[string]map[*subscriber]struct{}{}, grace: 8 * time.Second} }
+
+func (h *hub) joinedLocked() {
+	h.everJoined = true
+	h.total++
+	if h.idleTimer != nil {
+		h.idleTimer.Stop()
+		h.idleTimer = nil
+	}
+}
+
+func (h *hub) leftLocked() {
+	h.total--
+	if h.total > 0 || !h.everJoined || h.onIdle == nil {
+		return
+	}
+	h.idleTimer = time.AfterFunc(h.grace, func() {
+		h.mu.Lock()
+		empty := h.total == 0
+		cb := h.onIdle
+		h.mu.Unlock()
+		if empty && cb != nil {
+			cb()
+		}
+	})
+}
 
 // join registers a subscriber; ok is false when the document is at its cap.
 func (h *hub) join(doc string) (*subscriber, bool) {
@@ -78,6 +112,7 @@ func (h *hub) join(doc string) (*subscriber, bool) {
 	}
 	s := newSubscriber()
 	set[s] = struct{}{}
+	h.joinedLocked()
 	h.broadcastLocked(doc, "presence")
 	return s, true
 }
@@ -86,6 +121,7 @@ func (h *hub) leave(doc string, s *subscriber) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.subs[doc], s)
+	h.leftLocked()
 	if len(h.subs[doc]) == 0 {
 		delete(h.subs, doc)
 		return

@@ -9,7 +9,8 @@ import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { ShareDrawer } from './components/ShareDrawer';
 import { SettingsModal } from './components/SettingsModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { Icon } from './components/ui';
+import { Icon, SlidePanel, RailHeader } from './components/ui';
+import type { RailFilter } from '@openplan/chrome';
 import { applyTheme, effectiveTheme, savedTheme, type Theme } from './lib/theme';
 import { commentsToJSON, commentsToMarkdown, download } from './lib/exports';
 import { fsAccessSupported, pickFolder, readFile, sha256Hex, slugify, type LocalFolder } from './lib/localfs';
@@ -45,7 +46,8 @@ export default function App() {
   const [orphans, setOrphans] = React.useState<Set<string>>(new Set());
   const [viewers, setViewers] = React.useState(0);
   const [newVersion, setNewVersion] = React.useState(false);
-  const [submitted, setSubmitted] = React.useState(false);
+  const [filter, setFilter] = React.useState<RailFilter>('all');
+  const [railHead, setRailHead] = React.useState(0);
   const [modal, setModal] = React.useState<'share' | 'settings' | 'history' | 'shortcuts' | null>(null);
   const [author, setAuthor] = React.useState(localAuthor());
   const [theme, setThemeState] = React.useState<Theme>(savedTheme());
@@ -314,7 +316,9 @@ export default function App() {
 
   const threads = buildThreads(comments);
   const openCount = threads.filter((t) => t.root.status !== 'resolved').length;
-  const items: RailItem[] = threads.map((t) => ({
+  const counts = { all: threads.length, open: openCount, resolved: threads.length - openCount };
+  const shown = threads.filter((t) => (filter === 'all' ? true : filter === 'open' ? t.root.status !== 'resolved' : t.root.status === 'resolved'));
+  const items: RailItem[] = shown.map((t) => ({
     id: t.root.id,
     anno: threadToAnnotation(t, author),
     resolved: t.root.status === 'resolved',
@@ -347,10 +351,9 @@ export default function App() {
         mode={mode} title={title} versionNo={versionNo} isLatest={!latestId || currentVersionId === latestId}
         role={role} viewers={viewers} newVersion={newVersion} author={author} theme={theme}
         leftOpen={leftOpen} railOpen={railOpen} focusMode={focusMode}
-        canShare={canShare} canWrite={canWrite && mode === 'local' || canWrite} submitted={submitted} openComments={openCount}
+        canShare={canShare} canWrite={canWrite} openComments={openCount}
         onHistory={() => setModal('history')} onShare={() => setModal('share')}
         onToggleLeft={() => setLeftOpen((v) => !v)} onToggleRail={() => setRailOpen((v) => !v)} onToggleFocus={() => setFocusMode((v) => !v)}
-        onSubmitReview={async () => { try { await api.submitReview(); setSubmitted(true); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
         onViewLatest={() => { if (latestId) setCurrentVersionId(latestId); setNewVersion(false); setOrphans(new Set()); }}
         onSetTheme={setTheme} onExportMd={exportMd} onExportJson={exportJson} onDownloadHtml={() => void downloadHtml()}
         onPrint={() => postToFrame({ type: 'opendocs:print' })} onUploadVersion={() => uploadRef.current?.click()}
@@ -359,7 +362,7 @@ export default function App() {
       <input ref={uploadRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadFile(f); e.target.value = ''; }} />
 
       <div className="op-app-body">
-        {showLeft && (
+        <SlidePanel open={showLeft} side="left" width={220}>
           <LeftPanel
             mode={mode} docs={docs} currentDoc={docSlug} headings={layout.headings} scrollTop={layout.scrollTop}
             folder={folder} fsSupported={fsAccessSupported()} openCounts={{ [docSlug]: openCount }} importing={importing}
@@ -367,7 +370,7 @@ export default function App() {
             onPickFolder={async () => { try { const f = await pickFolder(); if (f) setFolder(f); } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } }}
             onOpenLocalFile={(p) => { void openLocalFile(p); }}
           />
-        )}
+        </SlidePanel>
 
         <div className="od-doc-pane" ref={paneRef}>
           {!docSlug && (
@@ -384,16 +387,19 @@ export default function App() {
           {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
         </div>
 
-        {showRail && (
+        <SlidePanel open={showRail} side="right" width={340}>
           <div className="od-rail">
+            <div ref={(el) => { if (el && el.offsetHeight !== railHead) setRailHead(el.offsetHeight); }}>
+              <RailHeader count={openCount} filter={filter} counts={counts} onFilter={setFilter} onCopyMD={() => { void navigator.clipboard.writeText(commentsToMarkdown(title, comments)).then(() => showToast('Comments copied as Markdown')); }} onClose={() => setRailOpen(false)} />
+            </div>
             {items.length === 0 && (
               <div className="od-rail-empty">
                 <Icon name="chat_bubble" size={22} />
-                <div>{canComment ? 'Select text in the document to comment, ask or suggest.' : 'View-only link — you can read comments but not add them.'}</div>
+                <div>{filter !== 'all' ? `No ${filter} comments.` : canComment ? 'Select text in the document to comment, ask or suggest.' : 'View-only link — you can read comments but not add them.'}</div>
               </div>
             )}
             <AnchoredRail
-              items={items} anchors={layout.anchors} scrollTop={layout.scrollTop} scrollHeight={layout.scrollHeight}
+              items={items} anchors={layout.anchors} scrollTop={layout.scrollTop} scrollHeight={layout.scrollHeight} offset={railHead}
               focusId={focusId} canComment={canComment}
               onFocus={(id) => { setFocusId(id); postToFrame({ type: 'opendocs:scroll-to', id }); }}
               onEdit={async (id, body) => { await api.editComment(docSlug, id, body); await afterChange(); }}
@@ -403,7 +409,7 @@ export default function App() {
               onWheel={(dy) => postToFrame({ type: 'opendocs:scroll-by', dy })}
             />
           </div>
-        )}
+        </SlidePanel>
       </div>
 
       {sel && toolbarPos && !composer && <SelectionToolbar pos={toolbarPos} onAction={onToolbar} />}

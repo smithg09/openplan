@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
@@ -178,23 +179,40 @@ func TestPlaceholderServedAtRoot(t *testing.T) {
 	}
 }
 
-func TestDoneSignal(t *testing.T) {
+func TestDoneWhenReviewerClosesTheTab(t *testing.T) {
 	s, _ := newTestServer(t)
-	select {
-	case <-s.Done():
-		t.Fatal("Done should not be closed before the reviewer submits")
-	default:
-	}
-	// Posting twice must not panic (closing a closed channel).
-	for i := range 2 {
-		if w := do(t, s.Handler(), "POST", "/api/session/done", nil); w.Code != http.StatusOK {
-			t.Fatalf("done #%d: %d", i, w.Code)
+	s.hub.grace = 60 * time.Millisecond
+	closed := func(d time.Duration) bool {
+		select {
+		case <-s.Done():
+			return true
+		case <-time.After(d):
+			return false
 		}
 	}
-	select {
-	case <-s.Done():
-	default:
-		t.Fatal("Done should be closed after the reviewer submits")
+	if closed(100 * time.Millisecond) {
+		t.Fatal("not done before anyone has opened the review")
+	}
+	a, _ := s.hub.join("report")
+	if closed(150 * time.Millisecond) {
+		t.Fatal("not done while the reviewer is connected")
+	}
+	// A reload (leave then rejoin inside the grace period) must not end the review.
+	s.hub.leave("report", a)
+	b, _ := s.hub.join("report")
+	if closed(150 * time.Millisecond) {
+		t.Fatal("a quick reconnect must not end the review")
+	}
+	s.hub.leave("report", b)
+	if !closed(500 * time.Millisecond) {
+		t.Fatal("done once the last viewer has been gone past the grace period")
+	}
+}
+
+func TestSubmitEndpointIsGone(t *testing.T) {
+	s, _ := newTestServer(t)
+	if w := do(t, s.Handler(), "POST", "/api/session/done", nil); strings.HasPrefix(w.Header().Get("Content-Type"), "application/json") && w.Code == 200 {
+		t.Errorf("the submit endpoint was removed: %d %s", w.Code, w.Body)
 	}
 }
 

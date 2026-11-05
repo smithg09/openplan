@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ApiVersion } from '../api';
-import { Button, Icon, Modal } from './ui';
+import { Button, Icon, Modal, useDismiss } from './ui';
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -12,21 +12,28 @@ function when(iso: string): string {
  * Version history in the style of SlashDocs': every revision is immutable, open
  * any one to see exactly what reviewers saw, restore an old one as the new head.
  */
-export const VersionHistoryModal: React.FC<{
+type Props = {
   versions: ApiVersion[];
   currentId: string;
   canRestore: boolean;
   onOpen: (id: string) => void;
   onRestore: (id: string) => Promise<void>;
   onClose: () => void;
-}> = ({ versions, currentId, canRestore, onOpen, onRestore, onClose }) => {
+};
+
+export const VersionHistoryModal: React.FC<Props> = (p) => (
+  <Modal title="Version history" onClose={p.onClose} width={620}><Body {...p} /></Modal>
+);
+
+const Body: React.FC<Props> = ({ versions, currentId, canRestore, onOpen, onRestore }) => {
+  const onClose = useDismiss();
   const [busy, setBusy] = React.useState<string | null>(null);
   const [err, setErr] = React.useState('');
   const latest = versions[versions.length - 1]?.id;
   const rows = versions.map((v, i) => ({ v, n: i + 1 })).reverse();
 
   return (
-    <Modal title="Version history" onClose={onClose} width={620}>
+    <>
       <p className="od-hint" style={{ marginTop: 0 }}>
         Immutable revisions of this document. Open any version to inspect the exact HTML your reviewers saw; comments stay attached to the version they were made on.
       </p>
@@ -59,6 +66,6 @@ export const VersionHistoryModal: React.FC<{
         })}
       </div>
       {err && <div className="od-err" style={{ marginTop: 10 }}>{err}</div>}
-    </Modal>
+    </>
   );
 };

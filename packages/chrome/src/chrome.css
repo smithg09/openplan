@@ -369,3 +369,49 @@
   text-transform: uppercase; letter-spacing: 0.04em;
 }
 
+
+/* === Shared transitions & chrome additions (openplan + opendocs) === */
+@keyframes op-fade-out { to { opacity: 0; } }
+@keyframes op-pop-out { to { opacity: 0; transform: translateY(6px) scale(0.97); } }
+@keyframes op-drawer-in { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes op-drawer-out { to { transform: translateX(28px); opacity: 0; } }
+@keyframes op-menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+.op-overlay.is-closing { animation: op-fade-out 170ms ease-in forwards; pointer-events: none; }
+.op-overlay.is-closing .op-modal { animation: op-pop-out 170ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.op-overlay.is-closing .op-drawer { animation: op-drawer-out 170ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.op-overlay-right { justify-content: flex-end; align-items: stretch; }
+.op-drawer { max-width: 100vw; height: 100%; background: var(--bg-surface); border-left: 1px solid var(--border); box-shadow: -24px 0 64px rgba(0,0,0,.45); display: flex; flex-direction: column; animation: op-drawer-in 240ms cubic-bezier(.16,1,.3,1); }
+.op-drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.op-drawer-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.op-drawer-body { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.op-menu-anim { animation: op-menu-in 140ms cubic-bezier(.16,1,.3,1); transform-origin: top right; }
+
+/* side panels slide instead of popping */
+.op-slide { flex-shrink: 0; overflow: hidden; min-height: 0; display: flex; transition: width 240ms cubic-bezier(.16,1,.3,1), opacity 200ms ease; }
+.op-slide.is-closed { opacity: 0; pointer-events: none; }
+.op-slide-left { border-right: 0; } .op-slide-right { justify-content: flex-end; }
+.op-slide-inner { flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; }
+.op-slide-inner > .op-outline { width: 100%; flex: 1; }
+@media (prefers-reduced-motion: reduce) { .op-slide, .op-drawer, .op-menu-anim { transition: none !important; animation: none !important; } }
+
+/* header additions */
+.op-btn-wrap { position: relative; display: inline-flex; }
+.op-badge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: #fff; font: 600 9px/14px var(--font-mono); text-align: center; pointer-events: none; }
+.op-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent-fg); font: 600 10px var(--font-mono); display: grid; place-items: center; border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--border)); transition: border-color 120ms; }
+.op-avatar:hover { border-color: var(--accent); }
+.op-chip { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary); padding: 2px 7px; border-radius: 4px; background: var(--bg-subtle); display: inline-flex; gap: 6px; align-items: center; transition: background 100ms, color 100ms; }
+button.op-chip:hover { color: var(--text-primary); background: var(--bg-hover); }
+.op-btn.is-active { color: var(--text-primary); background: var(--bg-subtle); }
+.op-btn-icon-only { width: 28px; padding: 0; justify-content: center; }
+
+/* comments panel header (shared) */
+.op-rail-head-wrap { flex-shrink: 0; border-bottom: 1px solid var(--border); }
+.op-rail-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 14px; }
+.op-rail-title { font-size: 13px; font-weight: 650; color: var(--text-primary); }
+.op-rail-count { font-size: 12px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 6px; padding: 0 7px; min-width: 18px; text-align: center; }
+.op-rail-tabs { display: flex; gap: 2px; padding: 0 10px 8px; }
+.op-rail-tab { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 5px; font: 10.5px var(--font-mono); text-transform: capitalize; color: var(--text-muted); transition: background 100ms, color 100ms; }
+.op-rail-tab span { font-size: 10px; color: var(--text-faint); }
+.op-rail-tab:hover { background: var(--bg-subtle); color: var(--text-secondary); }
+.op-rail-tab.is-active { background: var(--bg-subtle); color: var(--text-primary); }

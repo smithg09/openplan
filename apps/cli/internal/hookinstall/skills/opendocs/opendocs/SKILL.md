@@ -31,7 +31,7 @@ When the user wants a report, RCA, postmortem, spec, review, analysis, launch pl
    - **Local only** — review on this machine.
    - **A proxy** — an opendocs-proxy so other people can comment through links (check `opendocs config proxy` for a saved default).
 4. Publish:
-   - Local: `opendocs review report.html` opens the review UI and **blocks until the reviewer clicks "Submit review"**, then prints the open comment threads as JSON on stdout.
+   - Local: `opendocs review report.html` opens the review UI and **blocks until the reviewer closes the browser tab**, then prints the open comment threads as JSON on stdout.
    - Proxy: `opendocs publish report.html [--proxy <url>]` prints a **commenter link** and a **viewer link** to share, plus an **editor link — keep that one private**. Give the user the commenter/viewer link.
 5. If a proxy is unreachable, say so and offer the local option instead of failing silently.
 
@@ -40,7 +40,7 @@ Return the printed link (or tell the user the review UI is open). Don't ask the 
 ### Acting on review comments
 
 1. Get the feedback:
-   - Local: the `opendocs review` output, or run it again and wait for them to submit.
+   - Local: the `opendocs review` output, or run it again and wait for them to close the tab.
    - Proxy: `opendocs feedback report.html` (prints immediately; does not wait).
 2. The JSON lists `open` threads — each has the exact `quote`, the `comment`, an optional `type` (`question`, `suggestion`, `deletion`; comment when absent), an optional `suggestion` (proposed replacement text), and `replies`. `resolved` is only a count.
 3. Edit the **existing HTML file** — do not regenerate the document. Change only what each thread needs and leave every other passage byte-identical (a rewritten sentence orphans its comment). Answer questions in your reply to the user, and in the document where it belongs. If you disagree with a comment, say so rather than ignoring it.

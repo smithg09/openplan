@@ -42,7 +42,7 @@ Comments attach to the *quoted words*. When you publish v2:
 ## Workflow
 
 ```
-opendocs review report.html      # local: opens the UI, blocks until the reviewer clicks Submit,
+opendocs review report.html      # local: opens the UI, blocks until the reviewer closes the tab,
                                  # prints open comment threads as JSON on stdout
 opendocs publish report.html     # shared: uploads to a proxy, prints viewer/commenter links
 opendocs feedback report.html    # shared: prints the open comment threads as JSON (no blocking)

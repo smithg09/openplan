@@ -2,7 +2,7 @@ import React from 'react';
 import { api } from '../api';
 import { localAuthor, setLocalAuthor } from '../adapt';
 import { applyTheme, savedTheme, type Theme } from '../lib/theme';
-import { Button, Icon, Modal } from './ui';
+import { Button, DismissButton, Icon, Modal } from './ui';
 
 export const SettingsModal: React.FC<{
   mode: 'local' | 'proxy';
@@ -37,7 +37,7 @@ export const SettingsModal: React.FC<{
         {saved && <span className="od-ok-inline">{saved}</span>}
         {err && <span className="od-err-inline">{err}</span>}
         <div style={{ flex: 1 }} />
-        <Button onClick={onClose}>Close</Button>
+        <DismissButton>Close</DismissButton>
         <Button kind="primary" onClick={() => void save()}>Save</Button>
       </>
     }>

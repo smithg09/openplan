@@ -14,6 +14,7 @@
       "version": "0.5.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/plan-viewer": "workspace:*",
         "@openplan/shared": "workspace:*",
         "@openplan/toolbar": "workspace:*",
@@ -33,6 +34,7 @@
       "version": "0.5.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/shared": "workspace:*",
         "@openplan/toolbar": "workspace:*",
         "react": "^18.3.1",
@@ -51,6 +53,7 @@
       "version": "0.5.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/shared": "workspace:*",
         "@openplan/toolbar": "workspace:*",
         "react": "^18.3.1",
@@ -69,6 +72,7 @@
       "version": "0.5.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/diff-viewer": "workspace:*",
         "@openplan/plan-viewer": "workspace:*",
         "@openplan/shared": "workspace:*",
@@ -106,6 +110,21 @@
       "peerDependencies": {
         "react": "^18.0.0",
         "react-dom": "^18.0.0",
+      },
+    },
+    "packages/chrome": {
+      "name": "@openplan/chrome",
+      "version": "0.5.0",
+      "dependencies": {
+        "@openplan/annotations": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "^18.3.17",
+        "react": "^18.3.1",
+        "typescript": "^5.7.3",
+      },
+      "peerDependencies": {
+        "react": "^18.0.0",
       },
     },
     "packages/diff-viewer": {
@@ -294,6 +313,8 @@
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
     "@openplan/annotations": ["@openplan/annotations@workspace:packages/annotations"],
+
+    "@openplan/chrome": ["@openplan/chrome@workspace:packages/chrome"],
 
     "@openplan/diff-viewer": ["@openplan/diff-viewer@workspace:packages/diff-viewer"],
 

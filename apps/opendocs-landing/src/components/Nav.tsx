@@ -1,5 +1,5 @@
 import React from 'react';
-import { SiteSwitcher } from '@openplan/shared';
+import { SiteSwitcher } from '@openplan/chrome';
 import { GithubIcon, SunIcon, MoonIcon } from '../icons';
 
 export default function Nav({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {

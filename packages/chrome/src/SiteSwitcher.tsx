@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@openplan/annotations';
 
 /** The sibling products that share a marketing presence. */
 export const SITES = [
@@ -13,7 +14,7 @@ const CSS = `
 .osw-btn{display:flex;align-items:center;gap:7px;background:none;border:0;padding:6px 8px;margin:-6px -8px;border-radius:8px;cursor:pointer;font:600 13px var(--font-mono,ui-monospace,monospace);color:var(--text-primary,#fafafa)}
 .osw-btn:hover,.osw-btn[aria-expanded=true]{background:var(--bg-subtle,#27272a)}
 .osw-p{color:var(--accent-fg,#93c5fd)}.osw-s{color:var(--text-faint,#52525b);font-weight:400}
-.osw-chev{width:10px;height:10px;color:var(--text-muted,#71717a);transition:transform .15s}
+.osw-chev{display:inline-flex;color:var(--text-muted,#71717a);transition:transform .18s cubic-bezier(.16,1,.3,1)}
 .osw-btn[aria-expanded=true] .osw-chev{transform:rotate(180deg)}
 .osw-menu{position:absolute;top:100%;left:-8px;min-width:250px;padding-top:10px;z-index:100}
 .osw-card{background:var(--bg-elevated,#1f1f23);border:1px solid var(--border,#2e2e33);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(0,0,0,.35)}
@@ -51,7 +52,7 @@ export function SiteSwitcher({ current }: { current: SiteId }) {
       <style>{CSS}</style>
       <button className="osw-btn" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} onFocus={show}>
         <span className="osw-p">$</span><span className="osw-s">/</span><span>{current}</span>
-        <svg className="osw-chev" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
+        <span className="osw-chev"><Icon name="expand_more" size={11} /></span>
       </button>
       {open && (
         <div className="osw-menu" role="menu">

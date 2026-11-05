@@ -109,7 +109,6 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 
 export const api = {
   session: () => req<ApiSession>('GET', '/api/session'),
-  submitReview: () => req('POST', '/api/session/done'),
   access: (doc: string) => req<{ role: Role }>('GET', `/api/docs/${encodeURIComponent(doc)}/access`),
   frameUrl: (doc: string, versionId: string) =>
     req<{ url: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame-url`),

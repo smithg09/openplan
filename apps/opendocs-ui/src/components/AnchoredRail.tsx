@@ -17,6 +17,8 @@ interface Props {
   anchors: Record<string, number>;
   scrollTop: number;
   scrollHeight: number;
+  /** Height of the panel header above the viewport, so cards line up with the document's top. */
+  offset?: number;
   focusId: string | null;
   canComment: boolean;
   onFocus: (id: string) => void;
@@ -36,7 +38,7 @@ const GAP = 10;
  * scrolls. Overlaps are pushed down; the focused/hovered card expands. Cards
  * whose words are gone (orphaned) stack after the last anchored card.
  */
-export const AnchoredRail: React.FC<Props> = ({ items, anchors, scrollTop, scrollHeight, focusId, canComment, onFocus, onEdit, onRemove, onResolve, onReply, onReact, onWheel }) => {
+export const AnchoredRail: React.FC<Props> = ({ items, anchors, scrollTop, scrollHeight, offset = 0, focusId, canComment, onFocus, onEdit, onRemove, onResolve, onReply, onReact, onWheel }) => {
   const [heights, setHeights] = React.useState<Record<string, number>>({});
   const [hover, setHover] = React.useState<string | null>(null);
   const observers = React.useRef(new Map<string, ResizeObserver>());
@@ -75,7 +77,7 @@ export const AnchoredRail: React.FC<Props> = ({ items, anchors, scrollTop, scrol
 
   return (
     <div className="od-rail-viewport" onWheel={(e) => onWheel(e.deltaY)}>
-      <div className="od-rail-track" style={{ height: Math.max(scrollHeight, tops.end + 80), transform: `translateY(${-scrollTop}px)` }}>
+      <div className="od-rail-track" style={{ height: Math.max(scrollHeight, tops.end + 80), transform: `translateY(${-(scrollTop + offset)}px)` }}>
         {items.map((it) => {
           const expanded = focusId === it.id || hover === it.id;
           return (

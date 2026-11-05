@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap");
 @import "./styles/tokens.css";
-@import "../../../packages/shared/src/chrome.css";
+@import "../../../packages/chrome/src/chrome.css";
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
@@ -47,7 +47,7 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--bg-sub
 .op-files-row:disabled { opacity: .5; }
 
 /* anchored comment rail */
-.od-rail { width: 340px; flex-shrink: 0; background: var(--bg-surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; position: relative; }
+.od-rail { width: 100%; flex: 1; background: var(--bg-surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; position: relative; }
 .od-rail-head { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .od-rail-title { font: 11px var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); }
 .od-rail-count { font: 11px var(--font-mono); color: var(--accent-fg); }

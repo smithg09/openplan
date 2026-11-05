@@ -1,6 +1,6 @@
 import React from 'react';
 import { api, type ApiShare, type Role } from '../api';
-import { Button, CopyButton, Drawer, Icon } from './ui';
+import { Button, CopyButton, Drawer, Icon, useDismiss } from './ui';
 
 const ROLE_HELP: Record<Role, string> = {
   viewer: 'Can read the document and its comments.',
@@ -139,8 +139,11 @@ function LocalShare({ doc, onOpenSettings }: { doc: string; onOpenSettings: () =
   );
 }
 
+const Inner: React.FC<{ mode: 'local' | 'proxy'; doc: string; onOpenSettings: () => void }> = ({ mode, doc, onOpenSettings }) => {
+  const dismiss = useDismiss();
+  return mode === 'proxy' ? <ProxyShare doc={doc} origin={window.location.origin} /> : <LocalShare doc={doc} onOpenSettings={() => { dismiss(); setTimeout(onOpenSettings, 180); }} />;
+};
+
 export const ShareDrawer: React.FC<{ mode: 'local' | 'proxy'; doc: string; onClose: () => void; onOpenSettings: () => void }> = ({ mode, doc, onClose, onOpenSettings }) => (
-  <Drawer title="Share document" onClose={onClose}>
-    {mode === 'proxy' ? <ProxyShare doc={doc} origin={window.location.origin} /> : <LocalShare doc={doc} onOpenSettings={() => { onClose(); onOpenSettings(); }} />}
-  </Drawer>
+  <Drawer title="Share document" onClose={onClose}><Inner mode={mode} doc={doc} onOpenSettings={onOpenSettings} /></Drawer>
 );

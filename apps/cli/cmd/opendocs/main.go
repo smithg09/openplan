@@ -205,8 +205,8 @@ func snapshotIfChanged(doc *store.Doc, content []byte) error {
 }
 
 // runServer starts srv, opens the browser at openPath, and blocks until SIGINT
-// (returning errInterrupted) or, when untilDone is set, until the reviewer
-// submits their review in the UI (returning nil).
+// (returning errInterrupted) or, when untilDone is set, until the reviewer has
+// closed the review tab (returning nil).
 func runServer(cmd *cobra.Command, srv *server.Server, openPath string, untilDone bool) error {
 	port, _ := cmd.Flags().GetInt("port")
 	actual, err := srv.Start(port)
@@ -222,7 +222,11 @@ func runServer(cmd *cobra.Command, srv *server.Server, openPath string, untilDon
 		}
 	}
 	fmt.Fprintf(os.Stderr, "opendocs: review server at %s\n", url)
-	fmt.Fprintln(os.Stderr, "opendocs: press Ctrl+C to stop")
+	if untilDone {
+		fmt.Fprintln(os.Stderr, "opendocs: waiting for the review — close the browser tab when you are done (Ctrl+C to cancel)")
+	} else {
+		fmt.Fprintln(os.Stderr, "opendocs: press Ctrl+C to stop")
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
@@ -241,7 +245,7 @@ func runServer(cmd *cobra.Command, srv *server.Server, openPath string, untilDon
 	}
 }
 
-// errInterrupted marks a Ctrl+C. `review` treats it as "no review submitted";
+// errInterrupted marks a Ctrl+C. `review` treats it as "review cancelled";
 // open/serve treat it as a normal exit.
 var errInterrupted = fmt.Errorf("interrupted")
 
@@ -334,7 +338,7 @@ func summarizeReview(comments []store.Comment, docSlug, headID string) reviewRes
 // can read the feedback without polling.
 var reviewCmd = &cobra.Command{
 	Use:   "review <file.html>",
-	Short: "Open a document, wait for the reviewer to submit, print their comments as JSON",
+	Short: "Open a document, wait until the reviewer closes the tab, print their comments as JSON",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path := args[0]
@@ -357,7 +361,7 @@ var reviewCmd = &cobra.Command{
 		srv.SetFocus(docSlug)
 		if err := runServer(cmd, srv, "/?doc="+docSlug, true); err != nil {
 			if errors.Is(err, errInterrupted) {
-				return fmt.Errorf("review not submitted (interrupted)")
+				return fmt.Errorf("review cancelled (interrupted)")
 			}
 			return err
 		}

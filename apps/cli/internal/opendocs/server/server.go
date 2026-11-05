@@ -57,11 +57,14 @@ type Server struct {
 
 // New returns a Server scoped to a project within the store.
 func New(st store.Backend, project, version string) *Server {
-	return &Server{store: st, project: project, version: version, done: make(chan struct{}), hub: newHub()}
+	s := &Server{store: st, project: project, version: version, done: make(chan struct{}), hub: newHub()}
+	s.hub.onIdle = func() { s.doneOnce.Do(func() { close(s.done) }) }
+	return s
 }
 
-// Done is closed once the reviewer submits their review in the UI. The
-// `opendocs review` command blocks on it.
+// Done is closed once the reviewer has closed the review tab (no viewer
+// connected for a grace period after at least one had). `opendocs review`
+// blocks on it, so there is no "submit" button to press.
 func (s *Server) Done() <-chan struct{} { return s.done }
 
 // SetFocus names the document the UI should open on load.
@@ -80,7 +83,6 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("POST /api/docs/{doc}/shares", s.guard(auth.ActWrite, s.handleMintShare))
 		mux.HandleFunc("DELETE /api/docs/{doc}/shares/{id}", s.guard(auth.ActWrite, s.handleRevokeShare))
 	} else {
-		mux.HandleFunc("POST /api/session/done", s.handleDone)
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
 		mux.HandleFunc("GET /api/search", s.handleSearch)
 		mux.HandleFunc("GET /api/settings", s.handleGetSettings)
@@ -218,12 +220,6 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 		"version": s.version,
 		"mode":    map[bool]string{true: "proxy", false: "local"}[s.multiTenant()],
 	})
-}
-
-// handleDone records that the reviewer finished; idempotent.
-func (s *Server) handleDone(w http.ResponseWriter, r *http.Request) {
-	s.doneOnce.Do(func() { close(s.done) })
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {
