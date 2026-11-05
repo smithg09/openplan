@@ -93,6 +93,7 @@ const (
 // Store is the root of the opendocs on-disk tree.
 type Store struct {
 	baseDir string
+	locks   sync.Map // doc dir -> *sync.Mutex, shared by every handle for that doc
 }
 
 // New returns a Store rooted at ~/.opendocs/docs.
@@ -105,16 +106,22 @@ func NewWithBase(base string) *Store {
 	return &Store{baseDir: base}
 }
 
-// Doc is a handle to one document's directory. It serializes its own writes.
+// Doc is a handle to one document's directory. Handles are cheap and created
+// per request, so the write lock lives in the Store and is shared by every
+// handle for the same document — otherwise each handle would lock only itself
+// and concurrent load-modify-save cycles would lose updates.
 type Doc struct {
 	dir string
-	mu  sync.Mutex
+	mu  *sync.Mutex
 }
 
 // Doc returns a handle for <project>/<doc>. It does not touch the disk until a
-// method writes or reads.
+// method writes or reads. Locking is per Store (in-process); a separate process
+// writing the same directory is not coordinated with.
 func (s *Store) Doc(project, doc string) *Doc {
-	return &Doc{dir: filepath.Join(s.baseDir, project, doc)}
+	dir := filepath.Join(s.baseDir, project, doc)
+	mu, _ := s.locks.LoadOrStore(dir, &sync.Mutex{})
+	return &Doc{dir: dir, mu: mu.(*sync.Mutex)}
 }
 
 // ListProjects returns the project slugs that have documents.

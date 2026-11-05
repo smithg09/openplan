@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -252,6 +253,58 @@ func reactionUsers(comments []Comment, id, emoji string) []string {
 		}
 	}
 	return nil
+}
+
+// Handles are created per request, so the lock must be shared across handles
+// for the same doc. Run with -race.
+func TestConcurrentCommentsAcrossHandles(t *testing.T) {
+	s := NewWithBase(t.TempDir())
+	v, _ := s.Doc("p", "d").CreateVersion([]byte("<p>x</p>"), "", "", "")
+
+	const n = 25
+	var wg sync.WaitGroup
+	for range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// A fresh handle each time, exactly like a request handler.
+			if _, err := s.Doc("p", "d").AddComment(Comment{Body: "c", CreatedOnVersionID: v.ID}); err != nil {
+				t.Errorf("AddComment: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	comments, _ := s.Doc("p", "d").ListComments()
+	if len(comments) != n {
+		t.Fatalf("lost updates: want %d comments, got %d", n, len(comments))
+	}
+}
+
+func TestSameHeadCreateVersionConflictsOnce(t *testing.T) {
+	s := NewWithBase(t.TempDir())
+	v1, _ := s.Doc("p", "d").CreateVersion([]byte("one"), "", "", "")
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = s.Doc("p", "d").CreateVersion([]byte("next-"+string(rune('a'+i))), v1.ID, "", "")
+		}()
+	}
+	wg.Wait()
+
+	conflicts := 0
+	for _, err := range errs {
+		if errors.Is(err, ErrConflict) {
+			conflicts++
+		}
+	}
+	if conflicts != 1 {
+		t.Fatalf("want exactly 1 ErrConflict from two same-head writes, got %d (%v)", conflicts, errs)
+	}
 }
 
 func TestSlug(t *testing.T) {

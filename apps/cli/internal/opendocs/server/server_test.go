@@ -27,6 +27,9 @@ func do(t *testing.T, h http.Handler, method, path string, body any) *httptest.R
 	} else {
 		r = httptest.NewRequest(method, path, nil)
 	}
+	if method != "GET" {
+		r.Header.Set("Content-Type", "application/json") // like the real UI client
+	}
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	return w
@@ -192,6 +195,94 @@ func TestDoneSignal(t *testing.T) {
 	case <-s.Done():
 	default:
 		t.Fatal("Done should be closed after the reviewer submits")
+	}
+}
+
+// A text/plain POST is a CORS "simple" request (no preflight); untrusted doc
+// scripts or other sites could use it to write. It must be refused.
+func TestFrameRefusesDirectNavigation(t *testing.T) {
+	s, doc := newTestServer(t)
+	v, _ := doc.CreateVersion([]byte("<html><body>secret doc</body></html>"), "", "", "")
+	path := "/api/docs/report/versions/" + v.ID + "/frame"
+
+	get := func(dest string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", path, nil)
+		if dest != "" {
+			r.Header.Set("Sec-Fetch-Dest", dest)
+		}
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, r)
+		return w
+	}
+
+	if w := get("document"); w.Code != http.StatusForbidden {
+		t.Errorf("top-level navigation: want 403, got %d", w.Code)
+	}
+	if w := get("iframe"); w.Code != http.StatusOK {
+		t.Errorf("iframe load: want 200, got %d", w.Code)
+	} else if w.Header().Get("X-Frame-Options") != "SAMEORIGIN" {
+		t.Errorf("iframe response missing X-Frame-Options: SAMEORIGIN")
+	}
+	if w := get(""); w.Code != http.StatusOK {
+		t.Errorf("non-browser client (no Sec-Fetch-Dest): want 200, got %d", w.Code)
+	}
+}
+
+func TestWritesRequireJSONContentType(t *testing.T) {
+	s, doc := newTestServer(t)
+	v, _ := doc.CreateVersion([]byte("<p>x</p>"), "", "", "")
+	h := s.Handler()
+
+	body := `{"body":"sneaky","createdOnVersionId":"` + v.ID + `","anchor":{"quote":"x"}}`
+	for _, ct := range []string{"text/plain", "application/x-www-form-urlencoded", ""} {
+		r := httptest.NewRequest("POST", "/api/docs/report/comments", strings.NewReader(body))
+		if ct != "" {
+			r.Header.Set("Content-Type", ct)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != http.StatusUnsupportedMediaType {
+			t.Errorf("Content-Type %q: want 415, got %d", ct, w.Code)
+		}
+	}
+	if comments, _ := doc.ListComments(); len(comments) != 0 {
+		t.Errorf("a rejected write must not persist; got %d comments", len(comments))
+	}
+
+	// application/json with a charset parameter is still fine.
+	r := httptest.NewRequest("POST", "/api/docs/report/comments", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json; charset=utf-8")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Errorf("json+charset: want 200, got %d %s", w.Code, w.Body)
+	}
+}
+
+func TestOversizedBodyRejected(t *testing.T) {
+	s, _ := newTestServer(t)
+	big := strings.Repeat("a", maxBodyBytes+1024)
+	r := httptest.NewRequest("POST", "/api/docs/report/versions", strings.NewReader(`{"html":"`+big+`"}`))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	if w.Code == http.StatusOK {
+		t.Fatalf("oversized body must be rejected, got 200")
+	}
+}
+
+func TestExplicitPortTakenIsAnError(t *testing.T) {
+	a, _ := newTestServer(t)
+	port, err := a.Start(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Stop()
+
+	b, _ := newTestServer(t)
+	if _, err := b.Start(port); err == nil {
+		b.Stop()
+		t.Fatalf("starting on taken port %d must fail instead of falling back to a random port", port)
 	}
 }
 

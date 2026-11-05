@@ -14,8 +14,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"mime"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,11 +72,36 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.handleDeleteComment)
 
 	mux.Handle("/", s.uiHandler())
-	return mux
+	return guardWrites(mux)
 }
 
-// Start begins listening. It tries preferred (if non-zero) then an ephemeral
-// port, serves in a goroutine, and returns the actual port.
+// maxBodyBytes caps request bodies (a document version is the largest payload).
+const maxBodyBytes = 5 << 20
+
+// guardWrites protects the mutating API from cross-origin and untrusted callers.
+//
+// The review iframe runs untrusted document scripts (allow-scripts), and any
+// website can also target a localhost server. A fetch() with
+// `Content-Type: text/plain` is a CORS "simple" request: it is sent without a
+// preflight, and our handlers would happily decode it as JSON. Requiring
+// `application/json` forces a preflight, which fails because we send no CORS
+// headers. Bodies are also size-capped.
+func guardWrites(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead {
+			ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+			if ct != "application/json" {
+				writeErr(w, http.StatusUnsupportedMediaType, errors.New("Content-Type must be application/json"))
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Start begins listening on preferred (0 = any free port), serves in a
+// goroutine, and returns the actual port.
 func (s *Server) Start(preferred int) (int, error) {
 	ln, err := listen(preferred)
 	if err != nil {
@@ -99,13 +126,18 @@ func (s *Server) Stop() {
 	_ = s.httpSrv.Shutdown(ctx)
 }
 
-func listen(preferred int) (net.Listener, error) {
-	if preferred != 0 {
-		if ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", preferred)); err == nil {
-			return ln, nil
+// listen binds the requested port. Port 0 means "pick any free port"; an
+// explicit port that is taken is an error, not a silent fallback — otherwise a
+// stale server keeps answering on the port the user (or a dev proxy) expects.
+func listen(port int) (net.Listener, error) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		if port != 0 {
+			return nil, fmt.Errorf("port %d is unavailable (is another opendocs running?): %w", port, err)
 		}
+		return nil, err
 	}
-	return net.Listen("tcp", "127.0.0.1:0")
+	return ln, nil
 }
 
 // ── API handlers ────────────────────────────────────────────────────────────
@@ -175,6 +207,14 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request) {
 // is meant to be loaded into a sandboxed iframe; it must never carry the host's
 // credentials, which the sandbox (no allow-same-origin) already guarantees.
 func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
+	// Only serve this into an <iframe>. Opened directly (a top-level navigation),
+	// the agent's HTML would run same-origin with the API and could read/write
+	// comments. Browsers set Sec-Fetch-Dest and pages cannot forge it; non-browser
+	// clients (curl, tests) omit it and are not a web threat, so they pass.
+	if dest := r.Header.Get("Sec-Fetch-Dest"); dest != "" && dest != "iframe" {
+		http.Error(w, "frame is only served into an iframe", http.StatusForbidden)
+		return
+	}
 	content, err := s.doc(r).ReadVersion(r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
 		http.Error(w, "version not found", http.StatusNotFound)
@@ -187,11 +227,16 @@ func (s *Server) handleFrame(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Isolation comes from the host embedding this in <iframe sandbox="allow-scripts">
-	// (no allow-same-origin => opaque origin, no API/cookie access). We do NOT
-	// also send a `Content-Security-Policy: sandbox` response header: Chromium
-	// blocks a sandbox-CSP document loaded inside an already-sandboxed frame
-	// (net::ERR_BLOCKED_BY_CLIENT). Hardening the direct-open case (serving
-	// frames from a sibling origin or behind a one-time token) is a follow-up.
+	// (no allow-same-origin => opaque origin, no API/cookie access). Direct-open
+	// is refused above via Sec-Fetch-Dest; SAMEORIGIN stops other sites embedding
+	// it without a sandbox.
+	//
+	// We deliberately send no `Content-Security-Policy: sandbox` header. An early
+	// attempt with it showed net::ERR_BLOCKED_BY_CLIENT in the Claude preview
+	// pane, but that error persisted after removing the header, so the cause was
+	// never isolated and this is NOT verified in stock Chromium. If it is, adding
+	// the header back would be belt-and-braces.
+	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	_, _ = w.Write(render.Frame(content))
 }
 

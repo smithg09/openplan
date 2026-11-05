@@ -229,10 +229,26 @@ Package layout (`apps/cli/internal/opendocs/`):
 **Sandbox model (important):** the doc renders in `<iframe sandbox="allow-scripts">` with **no
 `allow-same-origin`** (opaque origin, can't reach the API/cookies). The bridge runs *inside* the
 iframe and talks to the host only via `postMessage`; the host filters by
-`event.source === iframe.contentWindow` (origin is `"null"`). Do **not** add a
-`Content-Security-Policy: sandbox` response header to `/frame` — Chromium blocks a sandbox-CSP
-document inside an already-sandboxed iframe (`net::ERR_BLOCKED_BY_CLIENT`). Hardening the
-direct-open case (separate origin or one-time token) is a known follow-up.
+`event.source === iframe.contentWindow` (origin is `"null"`).
+
+Hardening around that (all in `internal/opendocs/server`, each with tests):
+
+- `/frame` refuses top-level navigation (`Sec-Fetch-Dest` other than `iframe` → 403) and sends
+  `X-Frame-Options: SAMEORIGIN`. Otherwise opening the frame URL directly would run the agent's HTML
+  same-origin with the API.
+- **All mutating `/api/` requests must be `Content-Type: application/json`** (else 415) and are capped
+  at 5 MB. Untrusted doc scripts or other sites could otherwise send a `text/plain` "simple" CORS
+  request (no preflight) that the handlers would decode as JSON. The UI client sends it on every
+  non-GET, including body-less ones.
+- An explicit `--port` that is taken is an error (no silent fallback to a random port).
+- `Store.Doc()` handles share a per-doc lock held in the `Store`; handles are created per request,
+  so a lock inside the handle would protect nothing. In-process only — a separate CLI process writing
+  the same dir is not coordinated.
+
+**Unverified:** there is deliberately no `Content-Security-Policy: sandbox` header on `/frame`. An
+early attempt with it gave `net::ERR_BLOCKED_BY_CLIENT` in the Claude preview pane, but the error
+persisted after removing the header, so the cause was never isolated and it has **not** been tested
+in stock Chromium. If it turns out to work there, adding it back is belt-and-braces.
 
 **Gotchas:** the API/store anchor uses `start`/`end`; the shared `CommentAnchor` uses
 `startOffset`/`endOffset` — conversion lives only in `apps/opendocs-ui/src/adapt.ts`. opendocs-ui
