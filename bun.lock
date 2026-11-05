@@ -32,7 +32,9 @@
       "name": "@openplan/opendocs-landing",
       "version": "0.5.0",
       "dependencies": {
+        "@openplan/annotations": "workspace:*",
         "@openplan/shared": "workspace:*",
+        "@openplan/toolbar": "workspace:*",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
       },

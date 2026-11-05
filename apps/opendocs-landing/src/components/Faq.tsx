@@ -1,28 +1,28 @@
 import React from 'react';
 
-const FAQ: [string, React.ReactNode][] = [
-  ['What is opendocs and how does it work?', 'opendocs is a review space for the HTML documents your agents produce. The agent publishes a self-contained HTML file, your team opens it and comments on the exact words, and the agent reads those comments and publishes the next version — all kept as one document with a full history.'],
-  ['Who is it for?', 'Anyone whose team uses agents to write specs, plans, RCAs or reports — and everyone downstream who has to review them. Publishing needs an agent or the CLI; reviewing only needs a link.'],
-  ['Do I need to be a developer?', 'To publish, someone runs a command (usually through an agent). To review, you just open a link, highlight text and comment — the same as any online doc.'],
-  ['Which agents work with it?', 'Claude Code, Codex CLI and Antigravity have one-command skill installs (`opendocs install <agent>`). Any agent that can run shell commands can use the CLI directly. Copilot CLI isn’t supported yet.'],
-  ['Where does my data live? Is it secure?', 'By default on your own machine (~/.opendocs). To share, you run the opendocs-proxy yourself. Documents render in a sandboxed iframe with no access to your comments or cookies; share links are capability tokens stored only as hashes, and live in the URL fragment so they never reach server logs. There’s no org SSO or SCIM yet.'],
-  ['Is it free and open source?', 'Yes — MIT licensed, shipped as single Go binaries. No subscription, no vendor lock-in.'],
-  ['How does it handle revisions?', 'Each publish adds an immutable version to the same document — same link, new version. Comments remember which version they were made on, and you can restore any old version as the new head.'],
-  ['Do agents change documents on their own?', 'No. The agent responds to feedback your team already left, the way a person would after reading comments. Nothing is edited unprompted.'],
-  ['What do I need to self-host?', 'A machine that can run one binary. SQLite is the default; Postgres is supported. Put a reverse proxy (or your host’s TLS) in front for HTTPS.'],
+const FAQ: [string, string][] = [
+  ['What is opendocs?', 'A review space for the HTML documents your agents produce. The agent publishes a self-contained HTML file, your team comments on exact sentences, and the agent reads the comments and publishes the next version — one document, full history.'],
+  ['Who is it for?', 'Teams whose agents write specs, plans, postmortems and reports, and the people who review them. Publishing takes an agent or the CLI; reviewing takes a link and a highlighter.'],
+  ['Which agents work with it?', 'Claude Code, Codex and Antigravity have one-command installs (opendocs install <agent>). Any agent that can run shell commands can use the CLI. Copilot CLI is not supported yet.'],
+  ['Where does my data live?', 'On your machine by default. To share, you run opendocs-proxy yourself (SQLite or Postgres). Documents render in a sandboxed iframe that cannot read your comments or cookies; link tokens are stored only as hashes.'],
+  ['Is there org-wide access control?', 'Not yet. Access is per-document by capability link (viewer, commenter, editor). There is no SSO or SCIM.'],
+  ['Is it free?', 'Yes. MIT licensed, shipped as single binaries. No subscription.'],
+  ['Do agents change documents on their own?', 'No. The agent responds to feedback your team already left, the way a person would after reading comments.'],
+  ['What do I need to self-host?', 'Somewhere to run one binary. SQLite is the default, Postgres is supported, and you put your own TLS in front.'],
 ];
 
 export default function Faq() {
   const [open, setOpen] = React.useState<number | null>(0);
   return (
-    <section className="sec" id="faq">
-      <div className="wrap narrow">
-        <h2 className="h2 c">Frequently asked questions</h2>
-        <div className="faq">
+    <section className="ps" id="faq">
+      <div className="wrap fq-wrap">
+        <div className="slabel">FAQ</div>
+        <h2 className="stitle">Questions, answered plainly</h2>
+        <div className="fq">
           {FAQ.map(([q, a], i) => (
-            <div className={`qa ${open === i ? 'open' : ''}`} key={q}>
-              <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}><span>{q}</span><i>{open === i ? '−' : '+'}</i></button>
-              {open === i && <p>{typeof a === 'string' ? a.split('`').map((p, k) => (k % 2 ? <code key={k}>{p}</code> : p)) : a}</p>}
+            <div key={q} className={`fq-i${open === i ? ' open' : ''}`}>
+              <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}><span>{q}</span><i>{open === i ? '–' : '+'}</i></button>
+              {open === i && <p>{a}</p>}
             </div>
           ))}
         </div>

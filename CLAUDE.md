@@ -220,7 +220,7 @@ separate module from importing `apps/cli/internal/*`. It ships as its own releas
 | `opendocs publish <file> [--proxy URL]` | Upload to an `opendocs-proxy`: first run creates the doc and prints commenter/viewer/**editor** links, later runs add a version to the same doc |
 | `opendocs feedback <file>` | One-shot JSON of open threads for a published file (no blocking; the proxy has no "Submit review" signal) |
 | `opendocs config proxy [url]` | Show/set the default proxy. Resolution: `--proxy` → `$OPENDOCS_PROXY` → saved default → hosted default (`remote.HostedURL`, empty until deployed) |
-| `opendocs install <claude\|codex\|agy>` | Write the opendocs skills (`opendocs-publish/-review/-open/-archive`) where that agent discovers them |
+| `opendocs install <claude\|codex\|agy>` | Write the single `opendocs` skill (structure follows the slashdocs skill) where that agent discovers it |
 
 Package layout (`apps/cli/internal/opendocs/`):
 
@@ -289,10 +289,17 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   https-or-localhost), `GET /api/docs/{doc}/remote`, `POST .../publish` (head version → proxy; first time creates the
   remote doc, later adds a version), `POST .../remote/links {role}` (mints a fresh revocable link). State is keyed
   `doc:<project>/<slug>` in `~/.opendocs/state.json`; **the editor token never goes to the browser**.
-  UI (`apps/opendocs-ui/src/components/`): `Modal`/`Menu`/`CopyButton`, `ShareModal` (proxy mode: manage links;
-  local mode: publish + copy links), `SettingsModal` (name, theme, proxy). Comment authoring is a **floating
-  "Comment" button → popover over the document**, positioned from the bridge's selection rect (the bridge
-  re-reports it on scroll); the rail only lists threads.
+  UI (`apps/opendocs-ui/src/`): reuses openplan's chrome — `packages/shared/src/chrome.css` (op-* primitives extracted
+  verbatim from apps/ui, imported by both apps), the Hugeicons registry in `@openplan/annotations`, `SelectionToolbar`/
+  `CommentPopover`/`SuggestionPopover` from `@openplan/toolbar`. `components/`: `TopBar`, `LeftPanel` (outline from the
+  bridge + documents + **local folders via the File System Access API**, imported as versions), `AnchoredRail` (cards
+  sit at their highlight's document Y, from the bridge's `opendocs:layout`), `VersionHistoryModal`, `ShareDrawer`
+  (SlashDocs-style), `SettingsModal`, `ShortcutsModal`. Documents follow light/dark: the bridge sets `data-theme`, a
+  class and `color-scheme` on the doc's `<html>` (guidelines tell agents to style both). Sandbox is
+  `allow-scripts allow-modals` (modals only so the bridge can `window.print()`). Comment `type`
+  (comment/question/suggestion/deletion/emoji) and `suggestion` are stored on the comment. `/api/docs/{doc}/…/restore`
+  and `…/raw` (octet-stream attachment) exist; doc ids are validated (`validDocID`) because the fs store joins them
+  into paths.
 - **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
   writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
   X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
@@ -361,10 +368,11 @@ binary, same as openplan.
 | `src/tokens.css` | Design tokens (separate from main UI) |
 | `src/icons.tsx` | SVG icon components |
 
-The opendocs landing is modelled on the structure of Razorpay's SlashDocs page (narrative statement, agent
-ticker, facts, feature blocks, FAQ) rebuilt in openplan's visual language; the `$ /` wordmark is shared. Its hero is
-a scripted animation (`components/Hero.tsx` stage machine) and `TryIt.tsx` is a working in-page review demo.
-Ticker items and demo copy are illustrative, not real usage data.
+The opendocs landing (`apps/opendocs-landing`) reuses **openplan's landing CSS and layout** (hero with agent chips +
+install box, trust strip, same buttons/nav) and adds: `DemoSection` (a working review UI built from the real
+`@openplan/toolbar` + `AnnoCard` components on a sample postmortem — select text to comment), `FlowSection` (numbered
+steps beside a terminal, no cards), `Features` (alternating rows separated by hairlines), `Faq`. Demo copy uses invented
+names and an invented incident; nothing is real usage data. No emoji in UI chrome (reactions are content).
 
 Both marketing navs render `SiteSwitcher` from `@openplan/shared` (`packages/shared/src/SiteSwitcher.tsx`): a hover/focus/click dropdown on the product name that links openplan ⇄ opendocs. Add a product to `SITES` there and both navs pick it up.
 

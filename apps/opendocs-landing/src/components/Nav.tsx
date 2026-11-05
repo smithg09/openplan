@@ -1,7 +1,6 @@
 import React from 'react';
 import { SiteSwitcher } from '@openplan/shared';
-
-const REPO = 'https://github.com/smithg09/openplan';
+import { GithubIcon, SunIcon, MoonIcon } from '../icons';
 
 export default function Nav({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {
   return (
@@ -9,12 +8,14 @@ export default function Nav({ theme, onToggle }: { theme: 'dark' | 'light'; onTo
       <div className="ni">
         <SiteSwitcher current="opendocs" />
         <div className="ns" />
-        <a className="nlink nhide" href="#how">How it works</a>
-        <a className="nlink nhide" href="#features">Features</a>
-        <a className="nlink nhide" href="#faq">FAQ</a>
-        <button className="thm" onClick={onToggle} title="Toggle theme" aria-label="Toggle theme">{theme === 'dark' ? '☀' : '☾'}</button>
-        <a className="nlink" href={REPO} target="_blank" rel="noreferrer">GitHub</a>
-        <a className="ncta" href="#install">Get started →</a>
+        <div className="nl">
+          <a href="#demo" className="nlink nhide">Try it</a>
+          <a href="#flow" className="nlink nhide">How it works</a>
+          <a href="#faq" className="nlink nhide">FAQ</a>
+          <button className="thm" onClick={onToggle} title="Toggle theme">{theme === 'dark' ? <SunIcon /> : <MoonIcon />}</button>
+          <a href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" className="nlink"><GithubIcon /> GitHub</a>
+          <a href="#install" className="ncta">Get started →</a>
+        </div>
       </div>
     </nav>
   );
