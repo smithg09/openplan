@@ -21,10 +21,10 @@ func TestInstallSkillsPerAgent(t *testing.T) {
 		if dir != filepath.Join(home, rel) {
 			t.Errorf("%s: dir = %s, want %s", agent, dir, filepath.Join(home, rel))
 		}
-		if len(written) != 4 {
-			t.Errorf("%s: wrote %v, want 4 skills", agent, written)
+		if len(written) != 1 {
+			t.Errorf("%s: wrote %v, want the single opendocs skill", agent, written)
 		}
-		for _, name := range []string{"opendocs-publish", "opendocs-review", "opendocs-open", "opendocs-archive"} {
+		for _, name := range []string{"opendocs"} {
 			b, err := os.ReadFile(filepath.Join(dir, name, "SKILL.md"))
 			if err != nil {
 				t.Fatalf("%s: %v", agent, err)

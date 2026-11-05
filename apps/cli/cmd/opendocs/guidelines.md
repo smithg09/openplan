@@ -22,7 +22,10 @@ the document renders and so comments keep pointing at the right words across ver
   select text, so avoid putting prose in images or canvas. Charts should be inline SVG with `<text>`
   labels, or have the key numbers also stated in prose.
 - **Responsive and theme-aware.** Readable at ~700px wide (the document pane is narrow next to the
-  comment rail). Support `@media (prefers-color-scheme: dark)` and set both `color` and `background`.
+  comment rail). The app tells your page whether it is shown in light or dark mode by setting
+  `data-theme="dark"|"light"` (and a matching `dark`/`light` class) on `<html>`, plus `color-scheme`.
+  Style both: put your palette in CSS variables and override them under `html[data-theme="dark"]`
+  (also add `@media (prefers-color-scheme: dark)` as a fallback). Always set both `color` and `background`.
 - **Lead with the answer.** Put the conclusion and the decisions you need first; details after.
 - **Plain, specific claims** that a reviewer can agree or disagree with — those are what get comments.
 

@@ -14,7 +14,7 @@ var installLocal bool
 var installCmd = &cobra.Command{
 	Use:   "install <claude|codex|agy>",
 	Short: "Install the opendocs skills into an agent CLI",
-	Long: `Writes the opendocs skills (publish, review, open, archive) where the agent
+	Long: `Writes the opendocs skill (publish, review, open, search) where the agent
 discovers them, so it knows when to publish a document and how to act on
 comments. Idempotent: re-running only rewrites skills whose content changed.
 
