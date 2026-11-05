@@ -16,9 +16,15 @@
  *   {type:'opendocs:selection-cleared'}
  *   {type:'opendocs:placements', placements:[{id, found, rect}]}
  *   {type:'opendocs:activate', id}                 reviewer clicked a highlight
+ *   {type:'opendocs:layout', scrollTop, scrollHeight, viewHeight, anchors:{id:top}, headings:[{id,level,text,top}]}
+ *   {type:'opendocs:scroll', scrollTop}
  *
  * Protocol (host -> frame):
- *   {type:'opendocs:paint', anchors:[{id, anchor, status}]}
+ *   {type:'opendocs:paint', anchors:[{id, anchor, status, type}]}
+ *   {type:'opendocs:theme', theme:'dark'|'light'}
+ *   {type:'opendocs:scroll-to-heading', id}
+ *   {type:'opendocs:scroll-by', dy}
+ *   {type:'opendocs:print'}
  *   {type:'opendocs:scroll-to', id}
  *   {type:'opendocs:clear'}
  *
@@ -182,7 +188,7 @@
   }
 
   // Wrap every text-node segment overlapping [start,end) in a highlight span.
-  function paint(index, start, end, id, status) {
+  function paint(index, start, end, id, status, type) {
     var painted = false;
     for (var i = 0; i < index.segments.length; i++) {
       var seg = index.segments[i];
@@ -197,6 +203,7 @@
       span.className = HL_CLASS;
       span.setAttribute("data-anchor-id", id);
       if (status) span.setAttribute("data-status", status);
+      span.setAttribute("data-type", type || "comment");
       mid.parentNode.replaceChild(span, mid);
       span.appendChild(mid);
       span.addEventListener("click", function (ev) {
@@ -238,11 +245,68 @@
         continue;
       }
       // Re-index after each paint since splitText mutates the tree.
-      paint(index, loc.start, loc.end, a.id, a.status);
+      paint(index, loc.start, loc.end, a.id, a.status, a.type);
       index = buildIndex();
       placements.push({ id: a.id, found: true, rect: firstRectFor(a.id) });
     }
     send({ type: "opendocs:placements", placements: placements });
+    reportLayout();
+  }
+
+  // ---- layout reporting (anchors + outline) ---------------------------------
+  // The host lays its comment rail out against these document-space positions,
+  // so cards stay level with the words they refer to as the page scrolls.
+  function docTop(el) {
+    return el.getBoundingClientRect().top + (window.pageYOffset || document.documentElement.scrollTop || 0);
+  }
+
+  function reportLayout() {
+    var anchors = {};
+    var marks = document.querySelectorAll("." + HL_CLASS);
+    for (var i = 0; i < marks.length; i++) {
+      var id = marks[i].getAttribute("data-anchor-id");
+      if (!(id in anchors)) anchors[id] = Math.round(docTop(marks[i]));
+    }
+    var headings = [];
+    var hs = document.querySelectorAll("h1,h2,h3");
+    for (var j = 0; j < hs.length; j++) {
+      var h = hs[j];
+      var text = (h.textContent || "").replace(/\s+/g, " ").trim();
+      if (!text) continue;
+      h.setAttribute("data-opendocs-h", String(j));
+      headings.push({ id: String(j), level: Number(h.nodeName.charAt(1)), text: text.slice(0, 120), top: Math.round(docTop(h)) });
+    }
+    var de = document.documentElement;
+    send({
+      type: "opendocs:layout",
+      scrollTop: window.pageYOffset || de.scrollTop || 0,
+      scrollHeight: Math.max(de.scrollHeight, document.body ? document.body.scrollHeight : 0),
+      viewHeight: window.innerHeight,
+      anchors: anchors,
+      headings: headings,
+    });
+  }
+
+  var layoutTimer = null;
+  function queueLayout() {
+    if (layoutTimer) return;
+    layoutTimer = setTimeout(function () {
+      layoutTimer = null;
+      reportLayout();
+    }, 80);
+  }
+
+  // ---- theme ----------------------------------------------------------------
+  // The host tells us light or dark. We expose it the ways documents commonly
+  // key off (data-theme, a class, color-scheme) so a document that supports
+  // both follows the app; one that doesn't is left alone apart from color-scheme.
+  function applyTheme(theme) {
+    var de = document.documentElement;
+    de.setAttribute("data-theme", theme);
+    de.setAttribute("data-opendocs-theme", theme);
+    de.classList.remove("dark", "light");
+    de.classList.add(theme);
+    de.style.colorScheme = theme;
   }
 
   function onSelection() {
@@ -288,6 +352,21 @@
       case "opendocs:clear":
         clearHighlights();
         break;
+      case "opendocs:theme":
+        applyTheme(msg.theme === "dark" ? "dark" : "light");
+        queueLayout();
+        break;
+      case "opendocs:scroll-to-heading": {
+        var hel = document.querySelector('[data-opendocs-h="' + cssEscape(msg.id) + '"]');
+        if (hel && hel.scrollIntoView) hel.scrollIntoView({ block: "start", behavior: "smooth" });
+        break;
+      }
+      case "opendocs:scroll-by":
+        window.scrollBy({ top: Number(msg.dy) || 0 });
+        break;
+      case "opendocs:print":
+        try { window.print(); } catch (e) { /* needs allow-modals */ }
+        break;
     }
   });
 
@@ -301,6 +380,7 @@
       scrollQueued = true;
       requestAnimationFrame(function () {
         scrollQueued = false;
+        send({ type: "opendocs:scroll", scrollTop: window.pageYOffset || document.documentElement.scrollTop || 0 });
         var sel = document.getSelection();
         if (sel && !sel.isCollapsed) onSelection();
       });
@@ -319,6 +399,10 @@
   // top of <head>, so buildIndex() would otherwise walk a null document.body.
   function ready() {
     send({ type: "opendocs:ready" });
+    reportLayout();
+    if (window.ResizeObserver) new ResizeObserver(queueLayout).observe(document.body);
+    window.addEventListener("load", queueLayout);
+    window.addEventListener("resize", queueLayout);
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", ready);

@@ -1,24 +1,15 @@
 import React from 'react';
 import { api } from '../api';
-import { setLocalAuthor, localAuthor } from '../adapt';
-import { Modal } from './Modal';
+import { localAuthor, setLocalAuthor } from '../adapt';
+import { applyTheme, savedTheme, type Theme } from '../lib/theme';
+import { Button, Icon, Modal } from './ui';
 
-export type Theme = 'dark' | 'light';
-
-export function applyTheme(t: Theme) {
-  document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : '');
-  try { localStorage.setItem('opendocs:theme', t); } catch { /* ignore */ }
-}
-
-export function savedTheme(): Theme {
-  try { return localStorage.getItem('opendocs:theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
-}
-
-export function SettingsModal({ mode, onClose, onAuthorChange }: {
+export const SettingsModal: React.FC<{
   mode: 'local' | 'proxy';
   onClose: () => void;
   onAuthorChange: (name: string) => void;
-}) {
+  onThemeChange: (t: Theme) => void;
+}> = ({ mode, onClose, onAuthorChange, onThemeChange }) => {
   const [name, setName] = React.useState(localAuthor());
   const [theme, setTheme] = React.useState<Theme>(savedTheme());
   const [proxy, setProxy] = React.useState('');
@@ -33,43 +24,46 @@ export function SettingsModal({ mode, onClose, onAuthorChange }: {
     setErr(''); setSaved('');
     try {
       const n = name.trim() || 'You';
-      setLocalAuthor(n);
-      onAuthorChange(n);
-      applyTheme(theme);
+      setLocalAuthor(n); onAuthorChange(n);
+      onThemeChange(theme);
       if (mode === 'local') setProxy((await api.setSettings(proxy.trim())).proxy);
-      setSaved('Saved.');
+      setSaved('Saved');
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
 
   return (
-    <Modal title="Settings" onClose={onClose}>
-      <label className="od-label">Your name</label>
-      <input className="od-input" value={name} onChange={(e) => setName(e.target.value)} />
-      <p className="od-hint">Shown on the comments you write from this browser.</p>
-
-      <label className="od-label">Theme</label>
-      <div className="od-seg" role="radiogroup">
-        {(['dark', 'light'] as Theme[]).map((t) => (
-          <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? 'on' : ''} onClick={() => { setTheme(t); applyTheme(t); }}>{t}</button>
-        ))}
-      </div>
-
-      {mode === 'local' && (
-        <>
-          <label className="od-label">Sharing proxy</label>
-          <input className="od-input" placeholder="https://docs.your-team.com (leave empty for local only)" value={proxy} onChange={(e) => setProxy(e.target.value)} />
-          <p className="od-hint">
-            Where <b>Share → Publish</b> uploads documents. Must be <code>https</code> (or <code>http://localhost</code>). The CLI’s <code>opendocs publish</code> uses the same setting.
-          </p>
-        </>
-      )}
-
-      <div className="od-actions">
+    <Modal title="Settings" onClose={onClose} width={520} foot={
+      <>
         {saved && <span className="od-ok-inline">{saved}</span>}
         {err && <span className="od-err-inline">{err}</span>}
-        <button className="od-btn od-btn-ghost" onClick={onClose}>Close</button>
-        <button className="od-btn od-btn-primary" onClick={() => void save()}>Save</button>
+        <div style={{ flex: 1 }} />
+        <Button onClick={onClose}>Close</Button>
+        <Button kind="primary" onClick={() => void save()}>Save</Button>
+      </>
+    }>
+      <div className="op-settings-section">
+        <h3>Profile</h3>
+        <label className="od-label">Your name</label>
+        <input className="od-input" value={name} onChange={(e) => setName(e.target.value)} />
+        <p className="od-hint">Shown on the comments you write from this browser.</p>
       </div>
+      <div className="op-settings-section">
+        <h3>Appearance</h3>
+        <div className="op-menu-theme-row" style={{ padding: 0 }}>
+          {([['dark', 'Dark', 'dark_mode'], ['light', 'Light', 'light_mode'], ['system', 'Auto', 'brightness_auto']] as [Theme, string, string][]).map(([v, label, icon]) => (
+            <button key={v} className={`op-menu-theme-btn ${theme === v ? 'is-active' : ''}`} onClick={() => { setTheme(v); applyTheme(v); onThemeChange(v); }}><Icon name={icon} size={15} /><span>{label}</span></button>
+          ))}
+        </div>
+        <p className="od-hint">Documents follow this too: the app tells each page whether it is light or dark.</p>
+      </div>
+      {mode === 'local' && (
+        <div className="op-settings-section">
+          <h3>Sharing</h3>
+          <label className="od-label">Proxy URL</label>
+          <input className="od-input" placeholder="https://docs.your-team.com — leave empty to stay local" value={proxy} onChange={(e) => setProxy(e.target.value)} />
+          <p className="od-hint">Where <b>Share → Publish</b> uploads documents. Must be https (or http://localhost). <code>opendocs publish</code> uses the same setting.</p>
+        </div>
+      )}
     </Modal>
   );
-}
+};

@@ -74,7 +74,12 @@ type Comment struct {
 	ID     string  `json:"id"`
 	Anchor *Anchor `json:"anchor,omitempty"`
 	Body   string  `json:"body"`
-	Author string  `json:"author,omitempty"`
+	// Type is the annotation kind: "comment" (default), "question", "suggestion"
+	// or "deletion" (the anchored words should be removed). Suggestion carries
+	// the proposed replacement text.
+	Type       string `json:"type,omitempty"`
+	Suggestion string `json:"suggestion,omitempty"`
+	Author     string `json:"author,omitempty"`
 	// Owner is the hash of the capability token that wrote the comment (proxy
 	// mode only). It gates edit/delete rights and is never sent to clients.
 	Owner              string     `json:"owner,omitempty"`

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
+import { ReactionPicker } from './ReactionPicker';
 import { AnnoIcon, Icon, ANNOTATION_TYPES } from './icons';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -13,7 +14,6 @@ function formatAdded(iso: string): string {
   return `Added ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} at ${h}:${m} ${ap}`;
 }
 
-const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀', '👀'];
 
 interface AnnoCardProps {
   anno: Annotation;
@@ -176,17 +176,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
       )}
 
       {/* Reactions */}
-      {(reactions.length > 0 || (onReact && pickReaction)) && (
+      {reactions.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
           {reactions.map(r => (
             <button key={r.emoji} onClick={e => { e.stopPropagation(); onReact?.(anno.id, r.emoji); }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: onReact ? 'pointer' : 'default', fontSize: 12.5, padding: '2px 8px', borderRadius: 6, border: `1px solid ${r.reactedByMe ? 'var(--accent)' : 'var(--border)'}`, background: r.reactedByMe ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-inset)', color: 'var(--text-secondary)' }}>
               <span>{r.emoji}</span><span style={{ fontSize: 11 }}>{r.count}</span>
             </button>
-          ))}
-          {onReact && pickReaction && QUICK_REACTIONS.filter(e => !reactions.some(r => r.emoji === e)).map(e => (
-            <button key={e} onClick={ev => { ev.stopPropagation(); onReact(anno.id, e); setPickReaction(false); }}
-              style={{ fontSize: 13, padding: '2px 7px', borderRadius: 6, border: '1px dashed var(--border)', background: 'none', cursor: 'pointer' }}>{e}</button>
           ))}
         </div>
       )}
@@ -222,10 +218,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
       {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
         {onReact && (
-          <button title="React" style={ftBtn} onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
-            onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <Icon name="add_reaction" size={18} />
-          </button>
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <button title="React" style={ftBtn} onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
+              onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
+              <Icon name="add_reaction" size={18} />
+            </button>
+            {pickReaction && <ReactionPicker onPick={emoji => onReact(anno.id, emoji)} onClose={() => setPickReaction(false)} />}
+          </div>
         )}
         <div style={{ flex: 1 }} />
         {onReply && (

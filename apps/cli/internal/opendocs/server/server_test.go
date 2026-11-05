@@ -321,3 +321,27 @@ func TestSearchAPI(t *testing.T) {
 		t.Errorf("empty query = %d %s", w.Code, w.Body)
 	}
 }
+
+func TestDocIDMustNotEscapeTheStore(t *testing.T) {
+	s, _ := newTestServer(t)
+	h := s.Handler()
+	for _, bad := range []string{"%2e%2e", "..", "a%2Fb", "a%5Cb", "%00", "x%20y"} {
+		w := do(t, h, "POST", "/api/docs/"+bad+"/versions", createVersionReq{HTML: "x"})
+		if w.Code == 200 {
+			t.Errorf("doc id %q must be refused, got 200", bad)
+		}
+	}
+	if w := do(t, h, "POST", "/api/docs/ok-doc_1.v2/versions", createVersionReq{HTML: "x"}); w.Code != 200 {
+		t.Errorf("a normal slug must work, got %d %s", w.Code, w.Body)
+	}
+}
+
+func TestCommentTypeRoundTrips(t *testing.T) {
+	s, doc := newTestServer(t)
+	doc.CreateVersion([]byte("<p>x</p>"), "", "", "")
+	h := s.Handler()
+	w := do(t, h, "POST", "/api/docs/report/comments", map[string]any{"body": "swap it", "type": "suggestion", "suggestion": "better words", "anchor": map[string]any{"quote": "x"}})
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"type":"suggestion"`) || !strings.Contains(w.Body.String(), `"suggestion":"better words"`) {
+		t.Fatalf("type/suggestion lost: %d %s", w.Code, w.Body)
+	}
+}

@@ -1,76 +1,118 @@
 import React from 'react';
-import { AnnoCard } from '@openplan/annotations';
-import { Menu } from './components/Modal';
-import { ShareModal } from './components/ShareModal';
-import { SettingsModal, applyTheme, savedTheme } from './components/SettingsModal';
+import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
 import { api, captureToken, docFromPath, frameURL, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
+import { TopBar } from './components/TopBar';
+import { LeftPanel, type Heading } from './components/LeftPanel';
+import { AnchoredRail, type RailItem } from './components/AnchoredRail';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { ShareDrawer } from './components/ShareDrawer';
+import { SettingsModal } from './components/SettingsModal';
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { Icon } from './components/ui';
+import { applyTheme, effectiveTheme, savedTheme, type Theme } from './lib/theme';
+import { commentsToJSON, commentsToMarkdown, download } from './lib/exports';
+import { fsAccessSupported, pickFolder, readFile, sha256Hex, slugify, type LocalFolder } from './lib/localfs';
 
-/** Messages from the in-iframe bridge. */
+type Rect = { top: number; left: number; width: number; height: number };
 type BridgeMsg =
   | { type: 'opendocs:ready' }
-  | { type: 'opendocs:selection'; anchor: ApiAnchor; rect: DOMRectInit }
+  | { type: 'opendocs:selection'; anchor: ApiAnchor; rect: Rect }
   | { type: 'opendocs:selection-cleared' }
   | { type: 'opendocs:placements'; placements: { id: string; found: boolean }[] }
-  | { type: 'opendocs:activate'; id: string };
+  | { type: 'opendocs:activate'; id: string }
+  | { type: 'opendocs:scroll'; scrollTop: number }
+  | { type: 'opendocs:layout'; scrollTop: number; scrollHeight: number; anchors: Record<string, number>; headings: Heading[] };
+
+type Composer = null | 'comment' | 'question' | 'suggestion';
 
 export default function App() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [mode, setMode] = React.useState<'local' | 'proxy'>('local');
+  const [role, setRole] = React.useState<Role>('editor');
+  const [docs, setDocs] = React.useState<string[]>([]);
   const [docSlug, setDocSlug] = React.useState('');
   const [versions, setVersions] = React.useState<ApiVersion[]>([]);
   const [currentVersionId, setCurrentVersionId] = React.useState('');
   const [comments, setComments] = React.useState<ApiComment[]>([]);
-  const [sel, setSel] = React.useState<{ anchor: ApiAnchor; rect: { top: number; left: number; width: number; height: number } } | null>(null);
-  const [composing, setComposing] = React.useState(false);
-  const [docs, setDocs] = React.useState<string[]>([]);
-  const [modal, setModal] = React.useState<'share' | 'settings' | null>(null);
-  const [author, setAuthor] = React.useState(localAuthor());
-  const [draft, setDraft] = React.useState('');
-  const [focusId, setFocusId] = React.useState<string | null>(null);
-  const [orphans, setOrphans] = React.useState<Set<string>>(new Set());
-  const [submitted, setSubmitted] = React.useState(false);
-  const [mode, setMode] = React.useState<'local' | 'proxy'>('local');
-  const [role, setRole] = React.useState<Role>('editor');
   const [frameSrc, setFrameSrc] = React.useState('');
   const [frameHtml, setFrameHtml] = React.useState('');
+  const [layout, setLayout] = React.useState<{ scrollTop: number; scrollHeight: number; anchors: Record<string, number>; headings: Heading[] }>({ scrollTop: 0, scrollHeight: 0, anchors: {}, headings: [] });
+  const [sel, setSel] = React.useState<{ anchor: ApiAnchor; rect: Rect } | null>(null);
+  const [composer, setComposer] = React.useState<Composer>(null);
+  const [focusId, setFocusId] = React.useState<string | null>(null);
+  const [orphans, setOrphans] = React.useState<Set<string>>(new Set());
   const [viewers, setViewers] = React.useState(0);
   const [newVersion, setNewVersion] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState(false);
+  const [modal, setModal] = React.useState<'share' | 'settings' | 'history' | 'shortcuts' | null>(null);
+  const [author, setAuthor] = React.useState(localAuthor());
+  const [theme, setThemeState] = React.useState<Theme>(savedTheme());
+  const [leftOpen, setLeftOpen] = React.useState(true);
+  const [railOpen, setRailOpen] = React.useState(true);
+  const [focusMode, setFocusMode] = React.useState(false);
+  const [folder, setFolder] = React.useState<LocalFolder | null>(null);
+  const [importing, setImporting] = React.useState<string | null>(null);
+  const [toast, setToast] = React.useState('');
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const me = author;
   const paneRef = React.useRef<HTMLDivElement>(null);
-  const composingRef = React.useRef(false);
-  composingRef.current = composing;
-  React.useEffect(() => { applyTheme(savedTheme()); }, []);
-
-  // Refs so the once-registered message handler reads fresh state.
+  const uploadRef = React.useRef<HTMLInputElement>(null);
   const commentsRef = React.useRef(comments);
   commentsRef.current = comments;
   const roleRef = React.useRef(role);
   roleRef.current = role;
+  const composerRef = React.useRef(composer);
+  composerRef.current = composer;
   const versionRef = React.useRef(currentVersionId);
   versionRef.current = currentVersionId;
+  const themeRef = React.useRef<'dark' | 'light'>(effectiveTheme(theme));
 
-  // ── data loading ──────────────────────────────────────────────────────────
+  const canComment = role === 'commenter' || role === 'editor';
+  const canWrite = role === 'editor';
+  const canShare = mode === 'local' || role === 'editor';
+  const showToast = React.useCallback((m: string) => { setToast(m); window.setTimeout(() => setToast(''), 2600); }, []);
+
+  // ── theme ───────────────────────────────────────────────────────────────────
+  const postToFrame = React.useCallback((msg: unknown) => { iframeRef.current?.contentWindow?.postMessage(msg, '*'); }, []);
+  const setTheme = React.useCallback((t: Theme) => {
+    setThemeState(t);
+    themeRef.current = applyTheme(t);
+    postToFrame({ type: 'opendocs:theme', theme: themeRef.current });
+  }, [postToFrame]);
+  React.useEffect(() => {
+    themeRef.current = applyTheme(theme);
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const on = () => setTheme('system');
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [theme, setTheme]);
+
+  // ── data ────────────────────────────────────────────────────────────────────
   const refreshComments = React.useCallback(async (doc: string) => {
     const { comments } = await api.listComments(doc);
     setComments(comments ?? []);
     return comments ?? [];
   }, []);
 
-  // Open (or switch to) a document: load its versions and comments and reset
-  // everything that belongs to the previous one.
-  const openDoc = React.useCallback(async (doc: string) => {
-    setSel(null); setComposing(false); setDraft(''); setFocusId(null); setOrphans(new Set());
-    setFrameHtml(''); setNewVersion(false);
-    setDocSlug(doc);
+  const refreshVersions = React.useCallback(async (doc: string, select?: 'latest') => {
     const { versions } = await api.listVersions(doc);
     const vs = versions ?? [];
     setVersions(vs);
+    if (select === 'latest' && vs.length) setCurrentVersionId(vs[vs.length - 1].id);
+    return vs;
+  }, []);
+
+  const openDoc = React.useCallback(async (doc: string) => {
+    setSel(null); setComposer(null); setFocusId(null); setOrphans(new Set());
+    setFrameHtml(''); setNewVersion(false); setLayout({ scrollTop: 0, scrollHeight: 0, anchors: {}, headings: [] });
+    setDocSlug(doc);
+    const vs = await refreshVersions(doc);
     setCurrentVersionId(vs.length ? vs[vs.length - 1].id : '');
     await refreshComments(doc);
-  }, [refreshComments]);
+  }, [refreshComments, refreshVersions]);
 
   React.useEffect(() => {
     (async () => {
@@ -88,11 +130,7 @@ export default function App() {
           setDocs(docs ?? []);
           if (!doc) doc = (docs && docs[0]) || '';
         }
-        if (!doc) {
-          setLoading(false);
-          return;
-        }
-        await openDoc(doc);
+        if (doc) await openDoc(doc);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -101,25 +139,16 @@ export default function App() {
     })();
   }, [openDoc]);
 
-  // The iframe can't send an Authorization header, so in proxy mode fetch a
-  // short-lived signed URL for the selected version (never the token itself).
+  // The iframe can't send Authorization, so proxy mode uses a short-lived signed URL;
+  // the HTML is fetched as text and given to the sandbox as srcdoc (no iframe request).
   React.useEffect(() => {
     if (!docSlug || !currentVersionId) return;
-    if (mode !== 'proxy') {
-      setFrameSrc(frameURL(docSlug, currentVersionId));
-      return;
-    }
+    if (mode !== 'proxy') { setFrameSrc(frameURL(docSlug, currentVersionId)); return; }
     let live = true;
-    api.frameUrl(docSlug, currentVersionId)
-      .then((r) => live && setFrameSrc(r.url))
-      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    api.frameUrl(docSlug, currentVersionId).then((r) => live && setFrameSrc(r.url)).catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
     return () => { live = false; };
   }, [mode, docSlug, currentVersionId]);
 
-  // Load the (bridge-injected) HTML as text and give it to the iframe as srcdoc.
-  // This keeps the doc in an opaque-origin sandbox without the iframe making its
-  // own network request — some embedders (incl. Claude's preview pane) block
-  // requests from sandboxed subframes (ERR_BLOCKED_BY_CLIENT).
   React.useEffect(() => {
     if (!frameSrc) return;
     let live = true;
@@ -131,24 +160,47 @@ export default function App() {
     return () => { live = false; };
   }, [frameSrc]);
 
-  const canComment = role === 'commenter' || role === 'editor';
+  // ── bridge ──────────────────────────────────────────────────────────────────
+  const repaint = React.useCallback((list: ApiComment[]) => {
+    const anchors = list.filter((c) => !c.rootCommentId && c.anchor).map((c) => ({ id: c.id, anchor: c.anchor, status: c.status, type: c.type ?? 'comment' }));
+    postToFrame({ type: 'opendocs:paint', anchors });
+  }, [postToFrame]);
 
-  // ── bridge messaging ────────────────────────────────────────────────────────
-  const postToFrame = React.useCallback((msg: unknown) => {
-    iframeRef.current?.contentWindow?.postMessage(msg, '*');
-  }, []);
+  React.useEffect(() => {
+    function onMessage(ev: MessageEvent) {
+      if (ev.source !== iframeRef.current?.contentWindow) return; // opaque origin: filter by source
+      const msg = ev.data as BridgeMsg;
+      if (!msg || typeof msg.type !== 'string') return;
+      switch (msg.type) {
+        case 'opendocs:ready':
+          postToFrame({ type: 'opendocs:theme', theme: themeRef.current });
+          repaint(commentsRef.current);
+          break;
+        case 'opendocs:selection':
+          if (roleRef.current !== 'viewer') setSel({ anchor: msg.anchor, rect: msg.rect });
+          break;
+        case 'opendocs:selection-cleared':
+          if (!composerRef.current) setSel(null);
+          break;
+        case 'opendocs:placements':
+          setOrphans(new Set(msg.placements.filter((p) => !p.found).map((p) => p.id)));
+          break;
+        case 'opendocs:activate':
+          setFocusId(msg.id);
+          break;
+        case 'opendocs:scroll':
+          setLayout((l) => (l.scrollTop === msg.scrollTop ? l : { ...l, scrollTop: msg.scrollTop }));
+          break;
+        case 'opendocs:layout':
+          setLayout({ scrollTop: msg.scrollTop, scrollHeight: msg.scrollHeight, anchors: msg.anchors, headings: msg.headings });
+          break;
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [repaint, postToFrame]);
 
-  const repaint = React.useCallback(
-    (list: ApiComment[]) => {
-      const anchors = list
-        .filter((c) => !c.rootCommentId && c.anchor)
-        .map((c) => ({ id: c.id, anchor: c.anchor, status: c.status }));
-      postToFrame({ type: 'opendocs:paint', anchors });
-    },
-    [postToFrame],
-  );
-
-  // Live updates: another person commenting or publishing shows up without a reload.
+  // Live updates from other people.
   React.useEffect(() => {
     if (!docSlug) return;
     const ac = new AbortController();
@@ -159,7 +211,6 @@ export default function App() {
         void api.listVersions(docSlug).then(({ versions }) => {
           const vs = versions ?? [];
           setVersions(vs);
-          // Don't yank the page out from under a reader; offer the switch instead.
           if (vs.length && vs[vs.length - 1].id !== versionRef.current) setNewVersion(true);
         }).catch(() => {});
       }
@@ -167,252 +218,210 @@ export default function App() {
     return () => ac.abort();
   }, [docSlug, refreshComments, repaint]);
 
+  // ── comment actions ─────────────────────────────────────────────────────────
+  const afterChange = React.useCallback(async () => { repaint(await refreshComments(docSlug)); }, [docSlug, refreshComments, repaint]);
 
-  React.useEffect(() => {
-    function onMessage(ev: MessageEvent) {
-      // Sandboxed iframe has an opaque origin ("null"), so filter by source.
-      if (ev.source !== iframeRef.current?.contentWindow) return;
-      const msg = ev.data as BridgeMsg;
-      if (!msg || typeof msg.type !== 'string') return;
-      switch (msg.type) {
-        case 'opendocs:ready':
-          repaint(commentsRef.current);
-          break;
-        case 'opendocs:selection':
-          if (roleRef.current !== 'viewer') setSel({ anchor: msg.anchor, rect: msg.rect as { top: number; left: number; width: number; height: number } });
-          break;
-        case 'opendocs:selection-cleared':
-          // Keep the box while the reviewer is writing; otherwise drop the toolbar.
-          if (!composingRef.current) setSel(null);
-          break;
-        case 'opendocs:placements': {
-          const missing = new Set(msg.placements.filter((p) => !p.found).map((p) => p.id));
-          setOrphans(missing);
-          break;
-        }
-        case 'opendocs:activate':
-          setFocusId(msg.id);
-          break;
-      }
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [repaint]);
-
-  // ── actions ───────────────────────────────────────────────────────────────
-  const afterChange = React.useCallback(async () => {
-    const list = await refreshComments(docSlug);
-    repaint(list);
-  }, [docSlug, refreshComments, repaint]);
-
-  const cancelCompose = React.useCallback(() => { setSel(null); setComposing(false); setDraft(''); }, []);
-
-  const submitComment = React.useCallback(async () => {
-    if (!sel || !draft.trim()) return;
-    await api.addComment(docSlug, {
-      body: draft.trim(),
-      author: me,
-      createdOnVersionId: currentVersionId,
-      anchor: sel.anchor,
-    });
-    cancelCompose();
+  const addAnnotation = React.useCallback(async (a: { type: NonNullable<ApiComment['type']>; body: string; suggestion?: string }) => {
+    if (!sel) return;
+    await api.addComment(docSlug, { type: a.type, body: a.body, suggestion: a.suggestion, author, createdOnVersionId: currentVersionId, anchor: sel.anchor });
+    setSel(null); setComposer(null);
     await afterChange();
-  }, [sel, draft, docSlug, me, currentVersionId, afterChange, cancelCompose]);
+  }, [sel, docSlug, author, currentVersionId, afterChange]);
 
-  const onResolve = React.useCallback(
-    async (id: string) => {
-      const c = comments.find((x) => x.id === id);
-      if (!c) return;
-      await api.setStatus(docSlug, id, c.status === 'resolved' ? 'open' : 'resolved');
-      await afterChange();
-    },
-    [comments, docSlug, afterChange],
-  );
+  const onToolbar = (type: string, meta?: { emoji?: string }) => {
+    if (type === 'comment' || type === 'question' || type === 'suggestion') setComposer(type);
+    else if (type === 'deletion') void addAnnotation({ type: 'deletion', body: '' });
+    else if (type === 'emoji' && meta?.emoji) void addAnnotation({ type: 'emoji', body: meta.emoji });
+  };
 
-  const onReply = React.useCallback(
-    async (id: string, body: string) => {
-      await api.addComment(docSlug, {
-        body,
-        author: me,
-        createdOnVersionId: currentVersionId,
-        rootCommentId: id,
-      });
-      await afterChange();
-    },
-    [docSlug, me, currentVersionId, afterChange],
-  );
+  const onResolve = async (id: string) => {
+    const c = comments.find((x) => x.id === id);
+    if (!c) return;
+    await api.setStatus(docSlug, id, c.status === 'resolved' ? 'open' : 'resolved');
+    await afterChange();
+  };
+  const onReply = async (id: string, body: string) => {
+    await api.addComment(docSlug, { body, author, createdOnVersionId: currentVersionId, rootCommentId: id });
+    await afterChange();
+  };
 
-  // ── render ────────────────────────────────────────────────────────────────
-  if (loading) return <div className="od-loading">loading…</div>;
-  if (error) return <div className="od-loading od-error">error: {error}</div>;
-  if (!docSlug) return <div className="od-loading">{mode === 'proxy' ? 'Open a share link to view a document.' : <>No documents yet — run <code>&nbsp;opendocs open &lt;file&gt;&nbsp;</code></>}</div>;
+  // ── versions, import, export ────────────────────────────────────────────────
+  const latestId = versions[versions.length - 1]?.id ?? '';
+  const versionNo = Math.max(1, versions.findIndex((v) => v.id === currentVersionId) + 1);
+  const title = layout.headings.find((h) => h.level === 1)?.text || docSlug;
+
+  const importHtml = async (slug: string, html: string, label: string): Promise<void> => {
+    const hash = await sha256Hex(html);
+    const { versions: vs } = await api.listVersions(slug).catch(() => ({ versions: [] as ApiVersion[] | null }));
+    const head = (vs ?? [])[(vs ?? []).length - 1];
+    if (!head || head.contentHash !== hash) await api.createVersion(slug, { html, label, expectedHead: head?.id });
+  };
+
+  const openLocalFile = async (path: string) => {
+    const f = folder?.files.find((x) => x.path === path);
+    if (!f) return;
+    setImporting(path);
+    try {
+      const html = await readFile(f);
+      const slug = slugify(path.replace(/\.html?$/i, ''));
+      await importHtml(slug, html, path);
+      setDocs((await api.listDocs()).docs ?? []);
+      await openDoc(slug);
+    } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } finally { setImporting(null); }
+  };
+
+  const onUploadFile = async (file: File) => {
+    try {
+      const html = await file.text();
+      await api.createVersion(docSlug, { html, label: file.name, expectedHead: latestId || undefined });
+      await refreshVersions(docSlug, 'latest');
+      showToast(`Uploaded ${file.name} as a new version`);
+    } catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
+  };
+
+  const restore = async (id: string) => {
+    await api.restoreVersion(docSlug, id, latestId || undefined);
+    await refreshVersions(docSlug, 'latest');
+    showToast('Restored as the new latest version');
+  };
+
+  const exportMd = () => download(`${docSlug}-comments.md`, commentsToMarkdown(title, comments), 'text/markdown');
+  const exportJson = () => download(`${docSlug}-comments.json`, commentsToJSON(comments), 'application/json');
+  const downloadHtml = async () => {
+    try { download(`${docSlug}.html`, await api.rawVersion(docSlug, currentVersionId), 'text/html'); }
+    catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
+  };
+
+  // ── keyboard ────────────────────────────────────────────────────────────────
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '[') setLeftOpen((v) => !v);
+      else if (e.key === ']') setRailOpen((v) => !v);
+      else if (e.key === 'f') setFocusMode((v) => !v);
+      else if (e.key === 'h') setModal('history');
+      else if (e.key === '?') setModal('shortcuts');
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ── render ──────────────────────────────────────────────────────────────────
+  if (loading) return <div className="op-loading-center"><div className="op-spinner" /></div>;
+  if (error) return <div className="od-fatal"><Icon name="warning" size={20} /><div>{error}</div></div>;
 
   const threads = buildThreads(comments);
   const openCount = threads.filter((t) => t.root.status !== 'resolved').length;
-  const canShare = mode === 'local' || role === 'editor';
+  const items: RailItem[] = threads.map((t) => ({
+    id: t.root.id,
+    anno: threadToAnnotation(t, author),
+    resolved: t.root.status === 'resolved',
+    orphaned: orphans.has(t.root.id),
+    canEdit: canComment && t.root.type !== 'emoji' && (mode === 'local' || !!t.root.mine),
+    canRemove: canComment && (mode === 'local' || !!t.root.mine || role === 'editor'),
+  }));
 
-  // Floating comment UI, positioned from the selection rect the bridge reports
-  // (iframe viewport coordinates; the iframe fills the pane at 0,0).
+  // Floating toolbar / popover, in viewport coordinates (the iframe fills the pane).
   const pane = paneRef.current?.getBoundingClientRect();
-  const PW = 336, PH = 214, TW = 116, TH = 34;
-  let float: { left: number; top: number } | null = null;
+  let toolbarPos: { x: number; y: number } | null = null;
+  let popPos: { x: number; y: number } | null = null;
   if (sel && pane && canComment) {
     const r = sel.rect;
-    const visible = r.top + r.height > 0 && r.top < pane.height;
-    if (visible) {
-      const w = composing ? PW : TW, h = composing ? PH : TH;
-      const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, pane.width - w - 8));
-      const below = r.top + r.height + 10;
-      const top = below + h > pane.height ? Math.max(8, r.top - h - 10) : below;
-      float = { left, top };
+    const inView = r.top + r.height > 0 && r.top < pane.height;
+    if (inView) {
+      const cx = pane.left + r.left + r.width / 2;
+      const above = pane.top + r.top - 46;
+      toolbarPos = { x: Math.max(pane.left + 6, Math.min(cx - 86, pane.right - 180)), y: above < pane.top + 6 ? pane.top + r.top + r.height + 12 : above };
+      popPos = { x: Math.max(pane.left + 8, Math.min(cx - 160, pane.right - 332)), y: Math.min(pane.top + r.top + r.height + 12, pane.bottom - 250) };
     }
   }
 
+  const showLeft = leftOpen && !focusMode;
+  const showRail = railOpen && !focusMode;
+
   return (
-    <div className="od-app">
-      <div className="od-topbar">
-        <span className="od-brand"><span className="od-p">$</span><span className="od-s">/</span><b>opendocs</b></span>
-        {mode === 'local' && docs.length > 1 ? (
-          <Menu
-            align="left"
-            trigger={<span className="od-doc-title">{docSlug} <span className="od-caret">▾</span></span>}
-            items={docs.map((d) => ({ label: d, hint: d === docSlug ? '✓' : undefined, onSelect: () => { void openDoc(d); } }))}
+    <div className="op-app">
+      <TopBar
+        mode={mode} title={title} versionNo={versionNo} isLatest={!latestId || currentVersionId === latestId}
+        role={role} viewers={viewers} newVersion={newVersion} author={author} theme={theme}
+        leftOpen={leftOpen} railOpen={railOpen} focusMode={focusMode}
+        canShare={canShare} canWrite={canWrite && mode === 'local' || canWrite} submitted={submitted} openComments={openCount}
+        onHistory={() => setModal('history')} onShare={() => setModal('share')}
+        onToggleLeft={() => setLeftOpen((v) => !v)} onToggleRail={() => setRailOpen((v) => !v)} onToggleFocus={() => setFocusMode((v) => !v)}
+        onSubmitReview={async () => { try { await api.submitReview(); setSubmitted(true); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } }}
+        onViewLatest={() => { if (latestId) setCurrentVersionId(latestId); setNewVersion(false); setOrphans(new Set()); }}
+        onSetTheme={setTheme} onExportMd={exportMd} onExportJson={exportJson} onDownloadHtml={() => void downloadHtml()}
+        onPrint={() => postToFrame({ type: 'opendocs:print' })} onUploadVersion={() => uploadRef.current?.click()}
+        onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
+      />
+      <input ref={uploadRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadFile(f); e.target.value = ''; }} />
+
+      <div className="op-app-body">
+        {showLeft && (
+          <LeftPanel
+            mode={mode} docs={docs} currentDoc={docSlug} headings={layout.headings} scrollTop={layout.scrollTop}
+            folder={folder} fsSupported={fsAccessSupported()} openCounts={{ [docSlug]: openCount }} importing={importing}
+            onOpenDoc={(d) => { void openDoc(d); }} onHeading={(id) => postToFrame({ type: 'opendocs:scroll-to-heading', id })}
+            onPickFolder={async () => { try { const f = await pickFolder(); if (f) setFolder(f); } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } }}
+            onOpenLocalFile={(p) => { void openLocalFile(p); }}
           />
-        ) : (
-          <span className="od-doc-title">{docSlug}</span>
         )}
-        <div className="od-spacer" />
-        {viewers > 1 && <span className="od-role" title="People viewing this document right now">{viewers} here</span>}
-        {newVersion && (
-          <button className="od-btn od-btn-ghost" onClick={() => { const last = versions[versions.length - 1]; if (last) { setCurrentVersionId(last.id); setOrphans(new Set()); } setNewVersion(false); }}>
-            New version — view
-          </button>
-        )}
-        {mode === 'proxy' && <span className="od-role" title="What this link allows">{role}</span>}
-        {versions.length > 0 && (
-          <select
-            className="od-select"
-            value={currentVersionId}
-            onChange={(e) => {
-              setCurrentVersionId(e.target.value);
-              setOrphans(new Set());
-              if (versions.length && e.target.value === versions[versions.length - 1].id) setNewVersion(false);
-            }}
-          >
-            {versions.map((v, i) => (
-              <option key={v.id} value={v.id}>
-                {v.label || `version ${i + 1}`}
-                {i === versions.length - 1 ? ' (latest)' : ''}
-              </option>
-            ))}
-          </select>
-        )}
-        {mode === 'local' && (
-          <button
-            className="od-btn od-btn-ghost"
-            disabled={submitted}
-            title="Tell the agent you're done; it receives your open comments"
-            onClick={async () => {
-              try { await api.submitReview(); setSubmitted(true); }
-              catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-            }}
-          >
-            {submitted ? 'Review submitted ✓' : 'Submit review'}
-          </button>
-        )}
-        {canShare && <button className="od-btn od-btn-primary" onClick={() => setModal('share')}>Share</button>}
-        <Menu
-          trigger={<span className="od-gear" aria-label="Menu">⋯</span>}
-          items={[
-            ...(canShare ? [{ label: 'Share…', onSelect: () => setModal('share') }] : []),
-            { label: 'Settings…', onSelect: () => setModal('settings') },
-            'sep' as const,
-            { label: 'Documentation', onSelect: () => window.open('https://github.com/smithg09/openplan', '_blank', 'noreferrer') },
-            { label: 'About opendocs', onSelect: () => window.open('https://opendocs.smithgajjar.dev', '_blank', 'noreferrer') },
-          ]}
-        />
-      </div>
 
-      <div className="od-body">
         <div className="od-doc-pane" ref={paneRef}>
-          {currentVersionId && frameHtml && (
-            <iframe
-              key={currentVersionId}
-              ref={iframeRef}
-              className="od-frame"
-              sandbox="allow-scripts"
-              srcDoc={frameHtml}
-              title="document"
-            />
-          )}
-
-          {float && sel && !composing && (
-            <button
-              className="od-float-btn"
-              style={{ left: float.left, top: float.top }}
-              onMouseDown={(e) => e.preventDefault() /* keep the document selection */}
-              onClick={() => setComposing(true)}
-            >
-              <span aria-hidden>💬</span> Comment
-            </button>
-          )}
-          {float && sel && composing && (
-            <div className="od-float" style={{ left: float.left, top: float.top, width: PW }} role="dialog" aria-label="Add a comment">
-              <div className="od-composer-quote">{sel.anchor.quote}</div>
-              <textarea
-                autoFocus
-                value={draft}
-                placeholder="Add a comment…"
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') cancelCompose();
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submitComment(); }
-                }}
-              />
-              <div className="od-composer-actions">
-                <span className="od-faint-s">⌘↵ to post</span>
-                <div className="od-grow" />
-                <button className="od-btn od-btn-ghost" onClick={cancelCompose}>Cancel</button>
-                <button className="od-btn od-btn-primary" disabled={!draft.trim()} onClick={() => void submitComment()}>Comment</button>
-              </div>
+          {!docSlug && (
+            <div className="od-empty-doc">
+              <Icon name="description" size={30} />
+              <h2>{mode === 'proxy' ? 'Open a share link' : 'No document open'}</h2>
+              <p>{mode === 'proxy' ? 'Ask the document’s owner for a link.' : <>Pick a document on the left, open a folder of HTML files, or run <code>opendocs open report.html</code>.</>}</p>
             </div>
           )}
+          {docSlug && !frameHtml && <div className="od-skeleton" aria-hidden="true"><i /><i /><i /><i /></div>}
+          {currentVersionId && frameHtml && (
+            <iframe key={currentVersionId} ref={iframeRef} className="od-frame" sandbox="allow-scripts allow-modals" srcDoc={frameHtml} title="document" />
+          )}
+          {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
         </div>
 
-        <div className="od-rail">
-          <div className="od-rail-head">
-            <span>Comments</span>
-            <div className="od-spacer" />
-            <span>{openCount} open</span>
-          </div>
-          <div className="od-rail-list">
-            {threads.length === 0 && (
-              <div className="od-empty">{canComment ? 'Select text in the document to comment.' : 'View-only link — you can read comments but not add them.'}</div>
-            )}
-
-            {threads.map((t) => (
-              <div key={t.root.id}>
-                {orphans.has(t.root.id) && (
-                  <div className="od-orphan">⚠ orphaned in this version</div>
-                )}
-                <AnnoCard
-                  anno={threadToAnnotation(t, me)}
-                  isFocus={focusId === t.root.id}
-                  onClick={() => { setFocusId(t.root.id); postToFrame({ type: 'opendocs:scroll-to', id: t.root.id }); }}
-                  onEdit={canComment && (mode === 'local' || t.root.mine) ? async (id, body) => { await api.editComment(docSlug, id, body); await afterChange(); } : undefined}
-                  onRemove={canComment && (mode === 'local' || t.root.mine || role === 'editor') ? async () => { await api.deleteComment(docSlug, t.root.id); await afterChange(); } : undefined}
-                  onResolve={canComment ? onResolve : undefined}
-                  onReply={canComment ? onReply : undefined}
-                  onReact={canComment ? async (id, emoji) => { await api.react(docSlug, id, emoji, me); await afterChange(); } : undefined}
-                />
+        {showRail && (
+          <div className="od-rail">
+            {items.length === 0 && (
+              <div className="od-rail-empty">
+                <Icon name="chat_bubble" size={22} />
+                <div>{canComment ? 'Select text in the document to comment, ask or suggest.' : 'View-only link — you can read comments but not add them.'}</div>
               </div>
-            ))}
+            )}
+            <AnchoredRail
+              items={items} anchors={layout.anchors} scrollTop={layout.scrollTop} scrollHeight={layout.scrollHeight}
+              focusId={focusId} canComment={canComment}
+              onFocus={(id) => { setFocusId(id); postToFrame({ type: 'opendocs:scroll-to', id }); }}
+              onEdit={async (id, body) => { await api.editComment(docSlug, id, body); await afterChange(); }}
+              onRemove={async (id) => { await api.deleteComment(docSlug, id); await afterChange(); }}
+              onResolve={onResolve} onReply={onReply}
+              onReact={async (id, emoji) => { await api.react(docSlug, id, emoji, author); await afterChange(); }}
+              onWheel={(dy) => postToFrame({ type: 'opendocs:scroll-by', dy })}
+            />
           </div>
-        </div>
+        )}
       </div>
 
-      {modal === 'share' && <ShareModal mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('settings')} />}
-      {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} />}
+      {sel && toolbarPos && !composer && <SelectionToolbar pos={toolbarPos} onAction={onToolbar} />}
+      {sel && popPos && composer === 'suggestion' && (
+        <SuggestionPopover pos={popPos} quote={sel.anchor.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(body, suggestion) => void addAnnotation({ type: 'suggestion', body, suggestion })} />
+      )}
+      {sel && popPos && (composer === 'comment' || composer === 'question') && (
+        <CommentPopover pos={popPos} type={composer} quote={sel.anchor.quote} onCancel={() => { setComposer(null); setSel(null); }} onSave={(body) => void addAnnotation({ type: composer, body })} />
+      )}
+
+      {modal === 'history' && (
+        <VersionHistoryModal versions={versions} currentId={currentVersionId} canRestore={canWrite}
+          onOpen={(id) => { setCurrentVersionId(id); setOrphans(new Set()); if (id === latestId) setNewVersion(false); }}
+          onRestore={restore} onClose={() => setModal(null)} />
+      )}
+      {modal === 'share' && <ShareDrawer mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('settings')} />}
+      {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+      {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
     </div>
   );
 }

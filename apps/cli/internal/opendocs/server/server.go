@@ -17,6 +17,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -92,6 +93,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/docs/{doc}/access", s.guard(auth.ActRead, s.handleAccess))
 	mux.HandleFunc("GET /api/docs/{doc}/versions", s.guard(auth.ActRead, s.handleListVersions))
 	mux.HandleFunc("POST /api/docs/{doc}/versions", s.guard(auth.ActWrite, s.handleCreateVersion))
+	mux.HandleFunc("POST /api/docs/{doc}/versions/{id}/restore", s.guard(auth.ActWrite, s.handleRestore))
+	mux.HandleFunc("GET /api/docs/{doc}/versions/{id}/raw", s.guard(auth.ActRead, s.handleRaw))
 	mux.HandleFunc("GET /api/docs/{doc}/versions/{id}/frame-url", s.guard(auth.ActRead, s.handleFrameURL))
 	// The frame is authorised by a signed URL, not a bearer token (see handleFrame).
 	mux.HandleFunc("GET /api/docs/{doc}/versions/{id}/frame", s.handleFrame)
@@ -103,7 +106,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.guard(auth.ActModifyOwn, s.handleDeleteComment))
 
 	mux.Handle("/", s.uiHandler())
-	return s.limitWrites(guardWrites(mux))
+	return withDocID(s.limitWrites(guardWrites(mux)))
 }
 
 // maxBodyBytes caps request bodies (a document version is the largest payload).
@@ -175,6 +178,37 @@ func listen(port int) (net.Listener, error) {
 
 func (s *Server) doc(r *http.Request) store.DocStore {
 	return s.store.Doc(s.project, r.PathValue("doc"))
+}
+
+// validDocID accepts the slugs the store produces and the opaque ids the proxy
+// mints, and rejects anything that could name a different directory ("..", "."
+// or separators) — the filesystem store joins the id into a path.
+func validDocID(id string) bool {
+	if id == "" || id == "." || id == ".." || len(id) > 200 {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.') {
+			return false
+		}
+	}
+	return true
+}
+
+// withDocID rejects malformed document ids before any handler touches storage.
+func withDocID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Match on the escaped path: ServeMux unescapes each segment separately, so
+		// "a%2Fb" is ONE segment whose PathValue contains a slash.
+		if ep := r.URL.EscapedPath(); strings.HasPrefix(ep, "/api/docs/") {
+			seg, _, _ := strings.Cut(strings.TrimPrefix(ep, "/api/docs/"), "/")
+			if dec, err := url.PathUnescape(seg); seg != "" && (err != nil || !validDocID(dec)) {
+				writeErr(w, http.StatusBadRequest, errors.New("invalid document id"))
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
@@ -254,6 +288,52 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request, _ p
 		return
 	}
 	writeJSON(w, http.StatusOK, v)
+}
+
+// handleRestore makes an earlier version the new head (a new version whose
+// content is copied from it), so history is never rewritten.
+func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request, _ principal) {
+	var req struct {
+		ExpectedHead string `json:"expectedHead"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if s.limits.MaxVersions > 0 {
+		if vs, err := s.doc(r).ListVersions(); err == nil && len(vs) >= s.limits.MaxVersions {
+			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("version limit reached for this document"))
+			return
+		}
+	}
+	v, err := s.doc(r).Restore(r.PathValue("id"), req.ExpectedHead)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, http.StatusNotFound, err)
+	case errors.Is(err, store.ErrConflict):
+		writeErr(w, http.StatusConflict, err)
+	case err != nil:
+		writeErr(w, http.StatusInternalServerError, err)
+	default:
+		writeJSON(w, http.StatusOK, v)
+	}
+}
+
+// handleRaw returns a version's original HTML (no bridge) as a download. It is
+// served as an opaque attachment so a browser never renders it same-origin.
+func (s *Server) handleRaw(w http.ResponseWriter, r *http.Request, _ principal) {
+	content, err := s.doc(r).ReadVersion(r.PathValue("id"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "application/octet-stream")
+	h.Set("Content-Disposition", `attachment; filename="`+r.PathValue("doc")+`.html"`)
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Cache-Control", "private, no-store")
+	_, _ = w.Write(content)
 }
 
 // handleFrame serves one version's HTML with the bridge injected. This response

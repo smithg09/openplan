@@ -275,11 +275,13 @@ type reviewResult struct {
 }
 
 type reviewThread struct {
-	ID      string        `json:"id"`
-	Quote   string        `json:"quote"`
-	Author  string        `json:"author,omitempty"`
-	Comment string        `json:"comment"`
-	Replies []reviewReply `json:"replies,omitempty"`
+	Type       string        `json:"type,omitempty"`       // question | suggestion | deletion (comment when empty)
+	Suggestion string        `json:"suggestion,omitempty"` // proposed replacement for the quote
+	ID         string        `json:"id"`
+	Quote      string        `json:"quote"`
+	Author     string        `json:"author,omitempty"`
+	Comment    string        `json:"comment"`
+	Replies    []reviewReply `json:"replies,omitempty"`
 }
 
 type reviewReply struct {
@@ -318,7 +320,7 @@ func summarizeReview(comments []store.Comment, docSlug, headID string) reviewRes
 			res.Resolved++
 			continue
 		}
-		t := reviewThread{ID: c.ID, Author: c.Author, Comment: c.Body, Replies: replies[c.ID]}
+		t := reviewThread{ID: c.ID, Author: c.Author, Comment: c.Body, Replies: replies[c.ID], Type: c.Type, Suggestion: c.Suggestion}
 		if c.Anchor != nil {
 			t.Quote = c.Anchor.Quote
 		}

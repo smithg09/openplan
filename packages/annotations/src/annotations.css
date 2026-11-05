@@ -107,3 +107,27 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent) 18%, transparent), 0 1px 4px rgba(0,0,0,0.08);
 }
+
+/* === Reaction picker (floating) === */
+.op-react-pop {
+  position: absolute; left: 0; z-index: 60; width: 232px; padding: 12px 12px 10px;
+  background: var(--bg-elevated); border: 1px solid var(--border-strong); border-radius: 14px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5); animation: op-pop-in 140ms cubic-bezier(0.16,1,0.3,1);
+}
+.op-react-above { bottom: calc(100% + 10px); }
+.op-react-below { top: calc(100% + 10px); }
+.op-react-title { font-size: 12.5px; color: var(--text-secondary); margin: 0 2px 10px; }
+.op-react-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.op-react-cell {
+  height: 54px; border-radius: 12px; font-size: 26px; line-height: 1; display: grid; place-items: center;
+  transition: background 90ms, transform 90ms;
+}
+.op-react-cell:hover { background: var(--bg-hover); transform: scale(1.08); }
+.op-react-cell:active { transform: scale(.96); }
+.op-react-more { color: var(--text-muted); }
+.op-react-label { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); text-align: center; font-size: 12.5px; color: var(--text-secondary); min-height: 29px; }
+.op-react-custom { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; gap: 6px; }
+.op-react-custom input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-base); font-size: 13px; outline: none; }
+.op-react-custom input:focus { border-color: var(--accent); }
+.op-react-custom button { padding: 0 10px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; }
+.op-react-custom button:disabled { opacity: .45; }

@@ -20,10 +20,15 @@ var bridgeJS string
 // defaultStyle makes highlights visible even when the document ships no CSS for
 // them. Scoped to the bridge's class so it cannot clobber document styles.
 const defaultStyle = `<style id="opendocs-bridge-style">` +
-	`.opendocs-hl{background:rgba(47,102,245,.18);border-radius:2px;cursor:pointer;` +
-	`box-shadow:0 0 0 1px rgba(47,102,245,.28)}` +
-	`.opendocs-hl[data-status="resolved"]{background:rgba(31,157,85,.15);box-shadow:0 0 0 1px rgba(31,157,85,.3)}` +
-	`.opendocs-hl[data-status="orphaned"]{background:rgba(150,150,150,.18);box-shadow:none}` +
+	`.opendocs-hl{cursor:pointer;border-radius:2px;transition:background .15s;` +
+	`background:rgba(167,139,250,.22);border-bottom:2px solid rgba(167,139,250,.75)}` +
+	`.opendocs-hl:hover{background:rgba(167,139,250,.34)}` +
+	`.opendocs-hl[data-type="question"]{background:rgba(56,189,248,.2);border-bottom-color:rgba(56,189,248,.8)}` +
+	`.opendocs-hl[data-type="suggestion"]{background:rgba(45,212,191,.2);border-bottom-color:rgba(45,212,191,.8)}` +
+	`.opendocs-hl[data-type="deletion"]{background:rgba(239,68,68,.16);border-bottom:0;text-decoration:line-through;text-decoration-color:rgba(239,68,68,.9)}` +
+	`.opendocs-hl[data-status="resolved"]{background:rgba(34,197,94,.12);border-bottom-color:rgba(34,197,94,.5);text-decoration:none}` +
+	`.opendocs-hl[data-status="orphaned"]{background:rgba(150,150,150,.18);border-bottom:0}` +
+	`html[data-opendocs-theme="dark"]{color-scheme:dark}html[data-opendocs-theme="light"]{color-scheme:light}` +
 	`</style>`
 
 // BridgeJS returns the embedded bridge source (used by tests and the server's

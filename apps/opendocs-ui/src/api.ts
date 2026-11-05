@@ -19,6 +19,8 @@ export interface ApiComment {
   id: string;
   anchor?: ApiAnchor;
   body: string;
+  type?: 'comment' | 'question' | 'suggestion' | 'deletion' | 'emoji';
+  suggestion?: string;
   author?: string;
   createdOnVersionId: string;
   rootCommentId?: string;
@@ -127,6 +129,18 @@ export const api = {
     req<{ token: string; role: Role; id: string }>('POST', `/api/docs/${encodeURIComponent(doc)}/shares`, { role, label }),
   revokeShare: (doc: string, id: string) =>
     req('DELETE', `/api/docs/${encodeURIComponent(doc)}/shares/${encodeURIComponent(id)}`),
+  createVersion: (doc: string, body: { html: string; label?: string; summary?: string; expectedHead?: string }) =>
+    req<ApiVersion>('POST', `/api/docs/${encodeURIComponent(doc)}/versions`, body),
+  restoreVersion: (doc: string, id: string, expectedHead?: string) =>
+    req<ApiVersion>('POST', `/api/docs/${encodeURIComponent(doc)}/versions/${id}/restore`, { expectedHead: expectedHead ?? '' }),
+  /** Original HTML of a version (no bridge) — used for download/export. */
+  rawVersion: async (doc: string, id: string): Promise<string> => {
+    const headers: Record<string, string> = {};
+    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+    const res = await fetch(`/api/docs/${encodeURIComponent(doc)}/versions/${id}/raw`, { headers });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.text();
+  },
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),

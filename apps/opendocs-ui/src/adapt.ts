@@ -52,7 +52,8 @@ export function threadToAnnotation(t: Thread, me: string): Annotation {
   const c = t.root;
   return {
     id: c.id,
-    type: 'comment',
+    type: c.type ?? 'comment',
+    suggestion: c.suggestion,
     selectedText: c.anchor?.quote ?? '',
     from: 0,
     to: 0,

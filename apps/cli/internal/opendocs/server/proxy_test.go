@@ -395,3 +395,38 @@ func TestProxyHasNoSearch(t *testing.T) {
 		t.Errorf("proxy must not expose cross-document search: %s", w.Body)
 	}
 }
+
+func TestRestoreAndRawRoles(t *testing.T) {
+	e := newProxyEnv(t)
+	doc, editor, commenter, viewer := e.setup()
+	base := "/api/docs/" + doc
+	vs := decode[struct {
+		Versions []struct{ ID string } `json:"versions"`
+	}](t, e.call(viewer, "GET", base+"/versions", nil))
+	first := vs.Versions[0].ID
+	e.call(editor, "POST", base+"/versions", createVersionReq{HTML: "<p>second</p>"})
+
+	if got := e.call(commenter, "POST", base+"/versions/"+first+"/restore", map[string]string{}).Code; got != 403 {
+		t.Errorf("commenter restore = %d, want 403", got)
+	}
+	if got := e.call(editor, "POST", base+"/versions/nope/restore", map[string]string{}).Code; got != 404 {
+		t.Errorf("restore unknown = %d, want 404", got)
+	}
+	if got := e.call(editor, "POST", base+"/versions/"+first+"/restore", map[string]string{"expectedHead": "stale"}).Code; got != 409 {
+		t.Errorf("restore stale head = %d, want 409", got)
+	}
+	if w := e.call(editor, "POST", base+"/versions/"+first+"/restore", map[string]string{}); w.Code != 200 {
+		t.Fatalf("restore = %d %s", w.Code, w.Body)
+	}
+
+	raw := e.call(viewer, "GET", base+"/versions/"+first+"/raw", nil)
+	if raw.Code != 200 || !strings.Contains(raw.Body.String(), "hello world") || strings.Contains(raw.Body.String(), "opendocs-bridge") {
+		t.Errorf("raw = %d %q (want original html without the bridge)", raw.Code, raw.Body.String())
+	}
+	if ct := raw.Header().Get("Content-Type"); ct != "application/octet-stream" || !strings.HasPrefix(raw.Header().Get("Content-Disposition"), "attachment") {
+		t.Errorf("raw must be an attachment, got %q / %q", ct, raw.Header().Get("Content-Disposition"))
+	}
+	if got := e.call("", "GET", base+"/versions/"+first+"/raw", nil).Code; got != 401 {
+		t.Errorf("raw without token = %d, want 401", got)
+	}
+}
