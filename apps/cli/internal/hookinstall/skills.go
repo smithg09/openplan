@@ -15,14 +15,22 @@ import (
 // — each skill just tells the model to run an openplan subcommand and act on
 // its output — so one embedded copy is written out for every target agent.
 //
-//go:embed skills/openplan
+//go:embed skills/openplan skills/opendocs
 var skillsFS embed.FS
 
 const skillsRoot = "skills/openplan"
 
-// SkillNames lists the embedded skill directory names, in a stable order.
-func SkillNames() ([]string, error) {
-	entries, err := fs.ReadDir(skillsFS, skillsRoot)
+// opendocsSkillsRoot holds the opendocs skills, written by `opendocs install`.
+const opendocsSkillsRoot = "skills/opendocs"
+
+// SkillNames lists the embedded openplan skill directory names, in a stable order.
+func SkillNames() ([]string, error) { return skillNames(skillsRoot) }
+
+// OpendocsSkillNames lists the embedded opendocs skill names.
+func OpendocsSkillNames() ([]string, error) { return skillNames(opendocsSkillsRoot) }
+
+func skillNames(root string) ([]string, error) {
+	entries, err := fs.ReadDir(skillsFS, root)
 	if err != nil {
 		return nil, fmt.Errorf("reading embedded skills: %w", err)
 	}
@@ -35,19 +43,28 @@ func SkillNames() ([]string, error) {
 	return names, nil
 }
 
-// WriteSkills writes each embedded skill's SKILL.md to
+// WriteSkills writes each embedded openplan skill's SKILL.md to
 // destDir/<skill-name>/SKILL.md, creating directories as needed. It's
 // idempotent: a skill whose on-disk content already matches is left
 // untouched (and its name omitted from written). Returns the skill names
 // that were newly created or updated.
 func WriteSkills(destDir string) (written []string, err error) {
-	names, err := SkillNames()
+	return writeSkillSet(skillsRoot, destDir)
+}
+
+// WriteOpendocsSkills is WriteSkills for the opendocs skill set.
+func WriteOpendocsSkills(destDir string) (written []string, err error) {
+	return writeSkillSet(opendocsSkillsRoot, destDir)
+}
+
+func writeSkillSet(root, destDir string) (written []string, err error) {
+	names, err := skillNames(root)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, name := range names {
-		srcPath := filepath.Join(skillsRoot, name, "SKILL.md")
+		srcPath := filepath.Join(root, name, "SKILL.md")
 		content, err := fs.ReadFile(skillsFS, filepath.ToSlash(srcPath))
 		if err != nil {
 			return written, fmt.Errorf("reading embedded skill %q: %w", name, err)

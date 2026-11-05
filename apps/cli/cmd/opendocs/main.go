@@ -42,7 +42,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Version = version
-	rootCmd.AddCommand(createCmd, versionsCmd, commentsCmd, openCmd, serveCmd)
+	rootCmd.AddCommand(createCmd, versionsCmd, commentsCmd, openCmd, serveCmd, guidelinesCmd)
 }
 
 // projectSlug derives a stable per-project key from the current directory.
@@ -290,14 +290,20 @@ type reviewReply struct {
 // buildReview summarizes a document's comments: open threads in full, resolved
 // threads as a count (the agent only needs to act on what is still open).
 func buildReview(doc *store.Doc, docSlug string) (reviewResult, error) {
-	res := reviewResult{Doc: docSlug, Open: []reviewThread{}}
+	headID := ""
 	if head, err := doc.Head(); err == nil {
-		res.VersionID = head.ID
+		headID = head.ID
 	}
 	comments, err := doc.ListComments()
 	if err != nil {
-		return res, err
+		return reviewResult{Doc: docSlug, Open: []reviewThread{}, VersionID: headID}, err
 	}
+	return summarizeReview(comments, docSlug, headID), nil
+}
+
+// summarizeReview turns a flat comment list into the agent-facing summary.
+func summarizeReview(comments []store.Comment, docSlug, headID string) reviewResult {
+	res := reviewResult{Doc: docSlug, Open: []reviewThread{}, VersionID: headID}
 	replies := map[string][]reviewReply{}
 	for _, c := range comments {
 		if c.RootCommentID != "" {
@@ -318,7 +324,7 @@ func buildReview(doc *store.Doc, docSlug string) (reviewResult, error) {
 		}
 		res.Open = append(res.Open, t)
 	}
-	return res, nil
+	return res
 }
 
 // reviewCmd opens a document for review and blocks until the reviewer clicks

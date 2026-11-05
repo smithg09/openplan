@@ -215,6 +215,11 @@ separate module from importing `apps/cli/internal/*`. It ships as its own releas
 | `opendocs review <file.html>` | Like `open`, but blocks until the reviewer clicks **Submit review**, then prints open threads as JSON on stdout (status goes to stderr) |
 | `opendocs serve` | Project dashboard server |
 | `opendocs create <file.html>` / `versions <doc>` / `comments <doc>` / `restore <doc> <version-id>` | Store-backed CLI |
+| `opendocs guidelines` | Prints the HTML authoring contract (`cmd/opendocs/guidelines.md`, embedded); the publish skill tells agents to read it first |
+| `opendocs publish <file> [--proxy URL]` | Upload to an `opendocs-proxy`: first run creates the doc and prints commenter/viewer/**editor** links, later runs add a version to the same doc |
+| `opendocs feedback <file>` | One-shot JSON of open threads for a published file (no blocking; the proxy has no "Submit review" signal) |
+| `opendocs config proxy [url]` | Show/set the default proxy. Resolution: `--proxy` → `$OPENDOCS_PROXY` → saved default → hosted default (`remote.HostedURL`, empty until deployed) |
+| `opendocs install <claude\|codex\|agy>` | Write the opendocs skills (`opendocs-publish/-review/-open/-archive`) where that agent discovers them |
 
 Package layout (`apps/cli/internal/opendocs/`):
 
@@ -280,8 +285,14 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
   destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
   Render's free Postgres expires after ~30 days — use a paid/Neon/Supabase DB for anything lasting.
-- Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search,
-  the proxy-URL settings + local→hosted resolution chain in the CLI.
+- **CLI ↔ proxy:** `internal/opendocs/remote` is the client plus `~/.opendocs/state.json` (0600 — it holds
+  editor tokens, keyed by absolute file path). Proxy URLs must be https (http only for localhost).
+- **Skills** are embedded from `internal/hookinstall/skills/opendocs/` (`WriteOpendocsSkills`) and installed by
+  `opendocs install`: claude → `~/.claude/skills`, codex → `~/.codex/skills`, agy → `~/.gemini/skills` (global only).
+  **Copilot is deliberately unsupported** (no verified skills directory on this machine); `TestSkillsReferenceRealCommands`
+  fails if a skill mentions an `opendocs` subcommand that doesn't exist.
+- Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search, a
+  deployed hosted default (set `remote.HostedURL`).
 
 **Rendering finding (verified):** Claude's preview pane blocks the *network request* of a sandboxed
 (opaque-origin) iframe with `net::ERR_BLOCKED_BY_CLIENT`; same URL in a non-sandboxed or
