@@ -245,6 +245,30 @@ Hardening around that (all in `internal/opendocs/server`, each with tests):
   so a lock inside the handle would protect nothing. In-process only — a separate CLI process writing
   the same dir is not coordinated.
 
+**`opendocs-proxy` (third binary, `apps/cli/cmd/opendocs-proxy/`)** is the self-hostable multi-tenant
+server — same module, own release tarball (`opendocs-proxy_<os>_<arch>.tar.gz`), serves the same embedded
+opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) is unchanged and acts as an editor.
+
+- **Capability links, no accounts.** `POST /api/docs` mints an opaque doc id + editor token (the only
+  unauthenticated write). Editors mint viewer/commenter/editor tokens via `POST .../shares`. Tokens are
+  256-bit, sent as `Authorization: Bearer`, **only their sha256 is stored** (`auth/`). The proxy has no
+  "list all docs" endpoint; an unknown doc and a bad token both return 401 so ids can't be probed.
+- **Role matrix** (`auth.Role.Can`, pinned in `auth_test.go`): viewer reads; commenter also comments,
+  replies, reacts, resolves; editor also publishes/restores versions, shares, deletes any comment.
+  Edit is author-only for everyone (even editors). Each comment records `Owner` (token hash), which is
+  stripped from API responses and replaced by a per-caller `mine` flag.
+- **Frame URLs are signed, never tokened.** The iframe can't send headers and the doc's script can read its
+  own URL, so `GET .../versions/{id}/frame-url` (viewer+) returns an HMAC-signed, 5-minute, doc+version-scoped
+  `?sig=`. `/frame` in proxy mode accepts only that. Share links carry the token in the URL **fragment**
+  (`/d/<id>#t=<token>`); the UI moves it to `sessionStorage` and strips it from the address bar.
+- **Storage:** `--store sqlite` (default; `internal/opendocs/sqlstore`, pure-Go `modernc.org/sqlite`) or `fs`.
+  Both pass `store/storetest` (the shared contract suite). **sqlstore is imported only by the proxy**
+  (check: `go list -deps ./cmd/opendocs | grep -c modernc` must be 0). modernc is pinned to v1.44.0 because
+  newer releases force `go 1.26` in go.mod. State lives in `--data` (`opendocs.db`, `grants.json`,
+  `signing.key`, all 0600/0700). Single process owns it.
+- Not done yet: Postgres (PR 4), rate limits / size quotas for the public hosted instance (PR 4), TLS (put a
+  reverse proxy in front), folders/labels/search.
+
 **Unverified:** there is deliberately no `Content-Security-Policy: sandbox` header on `/frame`. An
 early attempt with it gave `net::ERR_BLOCKED_BY_CLIENT` in the Claude preview pane, but the error
 persisted after removing the header, so the cause was never isolated and it has **not** been tested

@@ -18,6 +18,7 @@ import (
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
 	"github.com/smithg09/openplan/cli/internal/opendocs/server"
+	"github.com/smithg09/openplan/cli/internal/opendocs/sqlstore"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 	"github.com/spf13/cobra"
 )
@@ -33,8 +34,9 @@ func main() {
 }
 
 var (
-	addr    string
-	dataDir string
+	addr      string
+	dataDir   string
+	storeKind string
 )
 
 var rootCmd = &cobra.Command{
@@ -48,6 +50,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Version = version
 	rootCmd.Flags().StringVar(&addr, "addr", "127.0.0.1:7435", "listen address (use 0.0.0.0:PORT to expose; put TLS in front)")
+	rootCmd.Flags().StringVar(&storeKind, "store", "sqlite", "document storage: sqlite (default) or fs (plain files)")
 	rootCmd.Flags().StringVar(&dataDir, "data", defaultDataDir(), "directory for documents, grants and the signing key")
 }
 
@@ -59,6 +62,9 @@ func defaultDataDir() string {
 }
 
 func run(cmd *cobra.Command, _ []string) error {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return err
+	}
 	key, err := auth.LoadOrCreateKey(filepath.Join(dataDir, "signing.key"))
 	if err != nil {
 		return err
@@ -68,7 +74,20 @@ func run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	grants := auth.NewFileGrants(filepath.Join(dataDir, "grants.json"))
-	st := store.NewWithBase(filepath.Join(dataDir, "docs")).Backend()
+	var st store.Backend
+	switch storeKind {
+	case "sqlite":
+		db, err := sqlstore.Open(filepath.Join(dataDir, "opendocs.db"))
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		st = db
+	case "fs":
+		st = store.NewWithBase(filepath.Join(dataDir, "docs")).Backend()
+	default:
+		return fmt.Errorf("unknown --store %q (want sqlite or fs)", storeKind)
+	}
 
 	srv := &http.Server{
 		Addr:              addr,
