@@ -19,8 +19,10 @@ interface AnnoCardProps {
   anno: Annotation;
   isFocus: boolean;
   onClick: () => void;
-  onEdit: (id: string, body: string) => void;
-  onRemove: () => void;
+  /** Omit to hide the edit control (e.g. a comment you did not write). */
+  onEdit?: (id: string, body: string) => void;
+  /** Omit to hide the remove control. */
+  onRemove?: () => void;
   onResolve?: (id: string) => void;
   onReply?: (id: string, body: string) => void;
   onReact?: (id: string, emoji: string) => void;
@@ -45,7 +47,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
   React.useEffect(() => { if (editing) { setEditValue(anno.body ?? ''); textareaRef.current?.focus(); } }, [editing, anno.body]);
   React.useEffect(() => { if (replying) replyRef.current?.focus(); }, [replying]);
 
-  const handleSave = () => { onEdit(anno.id, editValue); setEditing(false); };
+  const handleSave = () => { onEdit?.(anno.id, editValue); setEditing(false); };
   const handleReply = () => {
     if (replyValue.trim() && onReply) onReply(anno.id, replyValue.trim());
     setReplyValue(''); setReplying(false);
@@ -238,16 +240,18 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
             <Icon name="link" size={18} />
           </button>
         )}
-        {anno.type !== 'emoji' && anno.type !== 'deletion' && (
+        {onEdit && anno.type !== 'emoji' && anno.type !== 'deletion' && (
           <button title="Edit" style={ftBtn} onClick={e => { e.stopPropagation(); setEditing(true); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
             <Icon name="edit" size={17} />
           </button>
         )}
-        <button title="Remove" style={ftBtn} onClick={e => { e.stopPropagation(); onRemove(); }}
-          onMouseEnter={e => hoverable(e.currentTarget, 'var(--danger)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-          <Icon name="delete" size={17} />
-        </button>
+        {onRemove && (
+          <button title="Remove" style={ftBtn} onClick={e => { e.stopPropagation(); onRemove(); }}
+            onMouseEnter={e => hoverable(e.currentTarget, 'var(--danger)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
+            <Icon name="delete" size={17} />
+          </button>
+        )}
         {onResolve && (
           <button title={resolved ? 'Reopen' : 'Resolve'} style={{ ...ftBtn, color: resolved ? 'var(--teal)' : 'var(--text-faint)' }} onClick={e => { e.stopPropagation(); onResolve(anno.id); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--teal)')} onMouseLeave={e => unhover(e.currentTarget, resolved ? 'var(--teal)' : 'var(--text-faint)')}>

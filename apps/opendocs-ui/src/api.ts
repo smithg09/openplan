@@ -25,6 +25,8 @@ export interface ApiComment {
   status: 'open' | 'resolved';
   reactions?: ApiReaction[];
   edited?: boolean;
+  /** Proxy mode: whether the caller's token wrote this comment. */
+  mine?: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -42,15 +44,46 @@ export interface ApiSession {
   project: string;
   focus: string;
   version: string;
+  mode: 'local' | 'proxy';
+}
+
+export type Role = 'viewer' | 'commenter' | 'editor';
+
+// ── capability token (proxy mode) ───────────────────────────────────────────
+// Share links look like  /d/<docId>#t=<token>. The token rides in the URL
+// fragment so it is never sent to a server, logged, or leaked via Referer. We
+// move it into sessionStorage and strip it from the address bar immediately.
+const tokenKey = (doc: string) => `opendocs:token:${doc}`;
+
+/** Doc id from a /d/<id> path, or '' (local mode). */
+export function docFromPath(): string {
+  const m = /^\/d\/([^/]+)/.exec(window.location.pathname);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
+/** Capture #t=<token> into sessionStorage for doc and remove it from the URL. */
+export function captureToken(doc: string): void {
+  const m = /(?:^#|&)t=([^&]+)/.exec(window.location.hash);
+  if (!m) return;
+  sessionStorage.setItem(tokenKey(doc), decodeURIComponent(m[1]));
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+let activeToken = '';
+export function loadToken(doc: string): void {
+  activeToken = doc ? sessionStorage.getItem(tokenKey(doc)) ?? '' : '';
 }
 
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   // The server rejects any write that isn't application/json (this forces a CORS
   // preflight for cross-origin callers), so send it on every non-GET — even
   // body-less ones like DELETE and /session/done.
+  const headers: Record<string, string> = {};
+  if (method !== 'GET') headers['Content-Type'] = 'application/json';
+  if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
   const res = await fetch(url, {
     method,
-    headers: method !== 'GET' ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -68,6 +101,9 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 export const api = {
   session: () => req<ApiSession>('GET', '/api/session'),
   submitReview: () => req('POST', '/api/session/done'),
+  access: (doc: string) => req<{ role: Role }>('GET', `/api/docs/${encodeURIComponent(doc)}/access`),
+  frameUrl: (doc: string, versionId: string) =>
+    req<{ url: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame-url`),
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),
