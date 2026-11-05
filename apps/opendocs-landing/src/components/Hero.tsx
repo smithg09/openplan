@@ -22,11 +22,12 @@ export default function Hero() {
   const cmd = 'curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs';
   return (
     <div className="hero">
-      <div className="hbadge"><span className="bdot" />A review space for agent-written docs</div>
-      <h1 className="hh1">Your agents write the doc.<br /><em>Your team gets the last word.</em></h1>
+      <div className="hbadge"><span className="bdot" />For teams that work with agents</div>
+      <h1 className="hh1">Collaborate on the docs<br /><em>your agents write</em></h1>
       <p className="hsub">
-        opendocs is where plans, specs and reports your agents produce get reviewed. Comment on the exact words,
-        the agent reads your feedback and ships the next version, and every version stays on the record.
+        Agents can write great interactive docs: plans, specs, reports, code docs, PR write-ups.
+        opendocs gives them a home where your whole team reads, comments and decides together,
+        while the agent picks up every comment and keeps the doc improving. Every version is kept.
       </p>
 
       <div className="hrow">
