@@ -40,9 +40,30 @@ chmod +x "$INSTALL_DIR/$BIN"
 echo ""
 echo "Installed to $INSTALL_DIR/$BIN"
 
+if [ "$BIN" = "opendocs" ]; then
+  # Teach Claude Code about opendocs, unless the openplan plugin (which bundles the same skill) is already installed.
+  if [ -d "$HOME/.claude" ]; then
+    if grep -qs "openplan" "$HOME/.claude/plugins/installed_plugins.json" 2>/dev/null; then
+      echo ""
+      echo "Claude Code: the openplan plugin is installed and already includes the opendocs skill."
+    else
+      echo ""
+      echo "Found Claude Code (~/.claude). Installing the opendocs skill..."
+      "$INSTALL_DIR/opendocs" install claude || echo "Could not install the skill; run 'opendocs install claude' yourself."
+    fi
+  else
+    echo ""
+    echo "To teach an agent about opendocs, run one of:"
+    echo "  opendocs install claude | opendocs install codex | opendocs install agy"
+  fi
+fi
+
 if [ "$BIN" = "openplan" ]; then
   echo ""
   echo "To set up the Claude Code plugin, open Claude Code and run:"
   echo "  /plugin marketplace add smithg09/openplan"
   echo "  /plugin install openplan@openplan"
+  echo ""
+  echo "That plugin also gives Claude Code the opendocs skill (install the opendocs binary too:"
+  echo "  curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs)."
 fi

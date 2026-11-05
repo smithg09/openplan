@@ -1,5 +1,5 @@
 # Render blueprint for the hosted opendocs-proxy (Postgres-backed).
-# Render > New > Blueprint > pick this repo. The app and database are created together.
+# Render > New > Blueprint > pick this repo, then set DATABASE_URL (see DEPLOY.md).
 services:
   - type: web
     name: opendocs-proxy
@@ -8,10 +8,10 @@ services:
     healthCheckPath: /healthz
     plan: free
     envVars:
+      # Paste a Postgres connection string in the Render dashboard (see DEPLOY.md: Neon's free tier).
+      # Not a Render database on purpose: Render's free Postgres expires after ~30 days.
       - key: DATABASE_URL
-        fromDatabase:
-          name: opendocs-db
-          property: connectionString
+        sync: false
       - key: OPENDOCS_SIGNING_KEY
         generateValue: true
       # The hosted web app (opendocs.smithgajjar.dev/app) calls this API from the browser.
@@ -19,7 +19,3 @@ services:
         value: https://opendocs.smithgajjar.dev
     # Render terminates TLS and appends the real client IP as the last X-Forwarded-For hop.
     dockerCommand: opendocs-proxy --store postgres --trust-proxy
-
-databases:
-  - name: opendocs-db
-    plan: free

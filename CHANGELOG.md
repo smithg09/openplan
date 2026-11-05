@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Review UI** built on openplan's chrome: floating selection toolbar (comment, delete, suggest, question, reaction), anchored comment rail, outline and files panels (with local-folder import), version history (open / restore), share drawer, exports (Markdown, JSON, HTML, PDF), light/dark documents, and a bundled interactive sample (`opendocs demo`)
 - **`@openplan/chrome`** — shared app chrome (top bar, modals and drawers with enter/exit transitions, sliding side panels, dropdowns) now used by both openplan and opendocs
 - **opendocs landing page** with a working review demo built on the real review engine, and a product switcher between openplan and opendocs on both marketing sites; the page is annotatable like openplan's
+- The **opendocs skill is bundled in the Claude Code plugin** (`/plugin install openplan@openplan` now gives both products), and `install.sh opendocs` installs the skill automatically when Claude Code is detected
+- `DEPLOY.md`: step-by-step deployment of the site, web app, backend and database on free tiers (Cloudflare Pages + Render + Neon)
 - Floating **reaction picker** in comment cards, and an **All / Open / Resolved** filter in the comments panel (also in openplan)
 
 ### Changed
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One icon library (Hugeicons) everywhere: inline SVG and glyph icons were removed from both apps, both landing pages and the shared packages
 - Release and CI now build and publish `opendocs` and `opendocs-proxy` tarballs, and CI runs the PostgreSQL store contract against a Postgres service and builds the proxy Docker image
 - `scripts/install.sh` accepts `opendocs` and `opendocs-proxy`
+- `render.yaml` no longer creates a Render database (its free Postgres expires after ~30 days); `DATABASE_URL` is supplied by you (Neon's free tier is the documented path)
 
 ### Fixed
 

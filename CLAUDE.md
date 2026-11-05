@@ -324,14 +324,17 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
 - **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
   writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
   X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
-- **Hosted deploy:** `Dockerfile.opendocs-proxy` + `render.yaml` (Render web service + Postgres; not yet
-  deployed — needs the user's Render account). `apps/opendocs-landing/` (React+Vite, vanilla CSS, **same tokens as openplan's landing**) is the marketing site for Cloudflare Pages
+- **Hosted deploy:** see `DEPLOY.md` (Cloudflare Pages + Render free web service + Neon free Postgres). `Dockerfile.opendocs-proxy` +
+  `render.yaml` (web service only; `DATABASE_URL` is supplied, not a Render DB). Not deployed — needs the owner's accounts. `apps/opendocs-landing/` (React+Vite, vanilla CSS, **same tokens as openplan's landing**) is the marketing site for Cloudflare Pages
   (`.github/workflows/opendocs-site.yml`, needs `CLOUDFLARE_*` secrets and repo var `OPENDOCS_SITE_ENABLED=true`)
   including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
   destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
-  Render's free Postgres expires after ~30 days — use a paid/Neon/Supabase DB for anything lasting.
+  Render's free Postgres expires after ~30 days — use Neon (or another) for anything lasting.
 - **CLI ↔ proxy:** `internal/opendocs/remote` is the client plus `~/.opendocs/state.json` (0600 — it holds
   editor tokens, keyed by absolute file path). Proxy URLs must be https (http only for localhost).
+- **The opendocs skill also ships in the Claude plugin** (`apps/plugin/skills/opendocs/SKILL.md`, byte-identical to the embedded one —
+  `TestPluginSkillMatchesEmbedded` enforces it; copy the embedded file over it when you edit). `install.sh opendocs` runs
+  `opendocs install claude` when `~/.claude` exists and the openplan plugin isn't already installed.
 - **Skills** are embedded from `internal/hookinstall/skills/opendocs/` (`WriteOpendocsSkills`) and installed by
   `opendocs install`: claude → `~/.claude/skills`, codex → `~/.codex/skills`, agy → `~/.gemini/skills` (global only).
   **Copilot is deliberately unsupported** (no verified skills directory on this machine); `TestSkillsReferenceRealCommands`
