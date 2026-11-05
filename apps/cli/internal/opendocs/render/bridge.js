@@ -291,6 +291,23 @@
     }
   });
 
+  // Keep the host's floating comment UI glued to the selection while the
+  // document scrolls: re-report the selection (same anchor, fresh rect).
+  var scrollQueued = false;
+  window.addEventListener(
+    "scroll",
+    function () {
+      if (scrollQueued) return;
+      scrollQueued = true;
+      requestAnimationFrame(function () {
+        scrollQueued = false;
+        var sel = document.getSelection();
+        if (sel && !sel.isCollapsed) onSelection();
+      });
+    },
+    true
+  );
+
   document.addEventListener("mouseup", function () {
     setTimeout(onSelection, 0);
   });

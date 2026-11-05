@@ -47,6 +47,13 @@ export interface ApiSession {
   mode: 'local' | 'proxy';
 }
 
+export interface ApiShare {
+  id: string;
+  role: Role;
+  label?: string;
+  createdAt: string;
+}
+
 export type Role = 'viewer' | 'commenter' | 'editor';
 
 // ── capability token (proxy mode) ───────────────────────────────────────────
@@ -104,6 +111,22 @@ export const api = {
   access: (doc: string) => req<{ role: Role }>('GET', `/api/docs/${encodeURIComponent(doc)}/access`),
   frameUrl: (doc: string, versionId: string) =>
     req<{ url: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame-url`),
+  // Local mode: where "Share" publishes to, and what has been published.
+  getSettings: () => req<{ proxy: string }>('GET', '/api/settings'),
+  setSettings: (proxy: string) => req<{ proxy: string }>('POST', '/api/settings', { proxy }),
+  remoteStatus: (doc: string) =>
+    req<{ published: boolean; proxy?: string; id?: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/remote`),
+  publish: (doc: string, proxy?: string) =>
+    req<{ id: string; proxy: string; new: boolean }>('POST', `/api/docs/${encodeURIComponent(doc)}/publish`, { proxy: proxy ?? '' }),
+  remoteLink: (doc: string, role: Role) =>
+    req<{ link: string; role: Role }>('POST', `/api/docs/${encodeURIComponent(doc)}/remote/links`, { role }),
+  // Proxy mode (editors): manage this document's share links.
+  listShares: (doc: string) =>
+    req<{ shares: ApiShare[] }>('GET', `/api/docs/${encodeURIComponent(doc)}/shares`),
+  mintShare: (doc: string, role: Role, label: string) =>
+    req<{ token: string; role: Role; id: string }>('POST', `/api/docs/${encodeURIComponent(doc)}/shares`, { role, label }),
+  revokeShare: (doc: string, id: string) =>
+    req('DELETE', `/api/docs/${encodeURIComponent(doc)}/shares/${encodeURIComponent(id)}`),
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
+	"github.com/smithg09/openplan/cli/internal/opendocs/remote"
 	"github.com/smithg09/openplan/cli/internal/opendocs/render"
 	"github.com/smithg09/openplan/cli/internal/opendocs/search"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
@@ -42,6 +43,7 @@ type Server struct {
 	grants   auth.Grants
 	signer   *auth.Signer
 	hub      *hub
+	state    *remote.State // local mode: proxy setting + what was published where
 	limits   Limits
 	createRL *rateLimiter
 	writeRL  *rateLimiter
@@ -80,6 +82,11 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("POST /api/session/done", s.handleDone)
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
 		mux.HandleFunc("GET /api/search", s.handleSearch)
+		mux.HandleFunc("GET /api/settings", s.handleGetSettings)
+		mux.HandleFunc("POST /api/settings", s.handleSetSettings)
+		mux.HandleFunc("GET /api/docs/{doc}/remote", s.handleRemoteStatus)
+		mux.HandleFunc("POST /api/docs/{doc}/publish", s.handlePublish)
+		mux.HandleFunc("POST /api/docs/{doc}/remote/links", s.handleRemoteLink)
 	}
 	mux.HandleFunc("GET /api/docs/{doc}/events", s.guard(auth.ActRead, s.handleEvents))
 	mux.HandleFunc("GET /api/docs/{doc}/access", s.guard(auth.ActRead, s.handleAccess))
