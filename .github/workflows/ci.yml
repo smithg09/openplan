@@ -64,6 +64,14 @@ jobs:
       - name: Verify opendocs binary
         run: ./bin/opendocs --version
 
+      - name: Build opendocs-proxy
+        run: |
+          cd apps/cli
+          go build -ldflags="-s -w" -o ../../bin/opendocs-proxy ./cmd/opendocs-proxy
+
+      - name: Verify opendocs-proxy binary
+        run: ./bin/opendocs-proxy --version
+
       - name: Go tests
         run: |
           cd apps/cli

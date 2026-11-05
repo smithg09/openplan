@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs a release binary. Defaults to openplan; pass "opendocs" to install that instead:
+# Installs a release binary. Defaults to openplan; pass "opendocs" or "opendocs-proxy" to install those instead:
 #   curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash
 #   curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs
 set -e
@@ -8,8 +8,8 @@ BIN="${1:-openplan}"
 INSTALL_DIR="${OPENPLAN_INSTALL_DIR:-$HOME/.local/bin}"
 
 case "$BIN" in
-  openplan|opendocs) ;;
-  *) echo "Unknown binary: $BIN (expected openplan or opendocs)" >&2; exit 1 ;;
+  openplan|opendocs|opendocs-proxy) ;;
+  *) echo "Unknown binary: $BIN (expected openplan, opendocs or opendocs-proxy)" >&2; exit 1 ;;
 esac
 
 detect_platform() {

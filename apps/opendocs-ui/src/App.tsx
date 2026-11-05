@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnnoCard } from '@openplan/annotations';
-import { api, frameURL, type ApiComment, type ApiVersion, type ApiAnchor } from './api';
+import { api, captureToken, docFromPath, frameURL, loadToken, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
 
 /** Messages from the in-iframe bridge. */
@@ -23,6 +23,10 @@ export default function App() {
   const [focusId, setFocusId] = React.useState<string | null>(null);
   const [orphans, setOrphans] = React.useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = React.useState(false);
+  const [mode, setMode] = React.useState<'local' | 'proxy'>('local');
+  const [role, setRole] = React.useState<Role>('editor');
+  const [frameSrc, setFrameSrc] = React.useState('');
+  const [frameHtml, setFrameHtml] = React.useState('');
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const me = React.useMemo(() => localAuthor(), []);
@@ -30,6 +34,8 @@ export default function App() {
   // Refs so the once-registered message handler reads fresh state.
   const commentsRef = React.useRef(comments);
   commentsRef.current = comments;
+  const roleRef = React.useRef(role);
+  roleRef.current = role;
   const versionRef = React.useRef(currentVersionId);
   versionRef.current = currentVersionId;
 
@@ -44,8 +50,14 @@ export default function App() {
     (async () => {
       try {
         const session = await api.session();
+        setMode(session.mode);
         let doc = session.focus;
-        if (!doc) {
+        if (session.mode === 'proxy') {
+          doc = docFromPath();
+          captureToken(doc);
+          loadToken(doc);
+          setRole((await api.access(doc)).role);
+        } else if (!doc) {
           const { docs } = await api.listDocs();
           doc = (docs && docs[0]) || '';
         }
@@ -66,6 +78,38 @@ export default function App() {
       }
     })();
   }, [refreshComments]);
+
+  // The iframe can't send an Authorization header, so in proxy mode fetch a
+  // short-lived signed URL for the selected version (never the token itself).
+  React.useEffect(() => {
+    if (!docSlug || !currentVersionId) return;
+    if (mode !== 'proxy') {
+      setFrameSrc(frameURL(docSlug, currentVersionId));
+      return;
+    }
+    let live = true;
+    api.frameUrl(docSlug, currentVersionId)
+      .then((r) => live && setFrameSrc(r.url))
+      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => { live = false; };
+  }, [mode, docSlug, currentVersionId]);
+
+  // Load the (bridge-injected) HTML as text and give it to the iframe as srcdoc.
+  // This keeps the doc in an opaque-origin sandbox without the iframe making its
+  // own network request — some embedders (incl. Claude's preview pane) block
+  // requests from sandboxed subframes (ERR_BLOCKED_BY_CLIENT).
+  React.useEffect(() => {
+    if (!frameSrc) return;
+    let live = true;
+    setFrameHtml('');
+    fetch(frameSrc)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`document failed to load (${r.status})`))))
+      .then((t) => live && setFrameHtml(t))
+      .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => { live = false; };
+  }, [frameSrc]);
+
+  const canComment = role === 'commenter' || role === 'editor';
 
   // ── bridge messaging ────────────────────────────────────────────────────────
   const postToFrame = React.useCallback((msg: unknown) => {
@@ -93,7 +137,7 @@ export default function App() {
           repaint(commentsRef.current);
           break;
         case 'opendocs:selection':
-          setPending(msg.anchor);
+          if (roleRef.current !== 'viewer') setPending(msg.anchor);
           break;
         case 'opendocs:placements': {
           const missing = new Set(msg.placements.filter((p) => !p.found).map((p) => p.id));
@@ -156,7 +200,7 @@ export default function App() {
   // ── render ────────────────────────────────────────────────────────────────
   if (loading) return <div className="od-loading">loading…</div>;
   if (error) return <div className="od-loading od-error">error: {error}</div>;
-  if (!docSlug) return <div className="od-loading">No documents yet — run <code>&nbsp;opendocs open &lt;file&gt;&nbsp;</code></div>;
+  if (!docSlug) return <div className="od-loading">{mode === 'proxy' ? 'Open a share link to view a document.' : <>No documents yet — run <code>&nbsp;opendocs open &lt;file&gt;&nbsp;</code></>}</div>;
 
   const threads = buildThreads(comments);
   const openCount = threads.filter((t) => t.root.status !== 'resolved').length;
@@ -184,7 +228,8 @@ export default function App() {
             ))}
           </select>
         )}
-        <button
+        {mode === 'proxy' && <span className="od-role" title="What this link allows">{role}</span>}
+        {mode === 'local' && <button
           className="od-btn od-btn-primary"
           disabled={submitted}
           title="Tell the agent you're done; it receives your open comments"
@@ -194,18 +239,18 @@ export default function App() {
           }}
         >
           {submitted ? 'Review submitted ✓' : 'Submit review'}
-        </button>
+        </button>}
       </div>
 
       <div className="od-body">
         <div className="od-doc-pane">
-          {currentVersionId && (
+          {currentVersionId && frameHtml && (
             <iframe
               key={currentVersionId}
               ref={iframeRef}
               className="od-frame"
               sandbox="allow-scripts"
-              src={frameURL(docSlug, currentVersionId)}
+              srcDoc={frameHtml}
               title="document"
             />
           )}
@@ -239,7 +284,7 @@ export default function App() {
             )}
 
             {threads.length === 0 && !pending && (
-              <div className="od-empty">Select text in the document to comment.</div>
+              <div className="od-empty">{canComment ? 'Select text in the document to comment.' : 'View-only link — you can read comments but not add them.'}</div>
             )}
 
             {threads.map((t) => (
@@ -251,11 +296,11 @@ export default function App() {
                   anno={threadToAnnotation(t, me)}
                   isFocus={focusId === t.root.id}
                   onClick={() => { setFocusId(t.root.id); postToFrame({ type: 'opendocs:scroll-to', id: t.root.id }); }}
-                  onEdit={async (id, body) => { await api.editComment(docSlug, id, body); await afterChange(); }}
-                  onRemove={async () => { await api.deleteComment(docSlug, t.root.id); await afterChange(); }}
-                  onResolve={onResolve}
-                  onReply={onReply}
-                  onReact={async (id, emoji) => { await api.react(docSlug, id, emoji, me); await afterChange(); }}
+                  onEdit={canComment && (mode === 'local' || t.root.mine) ? async (id, body) => { await api.editComment(docSlug, id, body); await afterChange(); } : undefined}
+                  onRemove={canComment && (mode === 'local' || t.root.mine || role === 'editor') ? async () => { await api.deleteComment(docSlug, t.root.id); await afterChange(); } : undefined}
+                  onResolve={canComment ? onResolve : undefined}
+                  onReply={canComment ? onReply : undefined}
+                  onReact={canComment ? async (id, emoji) => { await api.react(docSlug, id, emoji, me); await afterChange(); } : undefined}
                 />
               </div>
             ))}

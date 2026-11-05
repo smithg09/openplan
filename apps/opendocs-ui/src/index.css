@@ -78,3 +78,13 @@ input, textarea, select { font: inherit; color: inherit; }
 
 .od-loading { display: flex; align-items: center; justify-content: center; height: 100vh; color: var(--text-muted); font-family: var(--font-mono); font-size: 13px; }
 .od-error { color: var(--danger); }
+
+.od-role {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
