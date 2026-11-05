@@ -13,4 +13,6 @@ opendocs serve
 
 This starts the dashboard server and opens it in the browser, listing the documents for the current project. For one document's history in the terminal use `opendocs versions <doc>`; to restore an older version as the new head use `opendocs restore <doc> <version-id>`.
 
-Run the command yourself and tell the user it is open.
+To **find** a document by what it says, run `opendocs search <words>` (every word must appear; `"quoted phrase"` for an exact phrase; `-word` to exclude; flags such as `--all-projects` or `--json` go **before** the query). It prints each match with a snippet — then use `opendocs open <file>` or the doc name with `opendocs versions <doc>`.
+
+Run the command yourself and tell the user the result.

@@ -23,6 +23,7 @@ import (
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
 	"github.com/smithg09/openplan/cli/internal/opendocs/render"
+	"github.com/smithg09/openplan/cli/internal/opendocs/search"
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
 
@@ -77,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	} else {
 		mux.HandleFunc("POST /api/session/done", s.handleDone)
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
+		mux.HandleFunc("GET /api/search", s.handleSearch)
 	}
 	mux.HandleFunc("GET /api/docs/{doc}/access", s.guard(auth.ActRead, s.handleAccess))
 	mux.HandleFunc("GET /api/docs/{doc}/versions", s.guard(auth.ActRead, s.handleListVersions))
@@ -188,6 +190,21 @@ func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"docs": docs})
+}
+
+// handleSearch finds documents in this project by title and latest text. It is
+// local-mode only: the proxy has no accounts, so there is no "my documents" set
+// to search across (each capability link reaches exactly one document).
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	res, err := search.Project(s.store, s.project, search.Parse(r.URL.Query().Get("q")))
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	if res == nil {
+		res = []search.Result{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": res})
 }
 
 func (s *Server) handleListVersions(w http.ResponseWriter, r *http.Request, _ principal) {

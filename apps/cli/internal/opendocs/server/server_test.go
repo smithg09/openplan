@@ -300,3 +300,24 @@ func TestSessionAPI(t *testing.T) {
 		t.Errorf("session missing focus: %s", w.Body)
 	}
 }
+
+func TestSearchAPI(t *testing.T) {
+	s, doc := newTestServer(t)
+	doc.CreateVersion([]byte("<title>Launch plan</title><body><p>Ship the beta soon</p></body>"), "", "", "")
+	h := s.Handler()
+
+	w := do(t, h, "GET", "/api/search?q=beta", nil)
+	var out struct {
+		Results []struct{ Doc, Title string } `json:"results"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if w.Code != 200 || len(out.Results) != 1 || out.Results[0].Doc != "report" || out.Results[0].Title != "Launch plan" {
+		t.Fatalf("search = %d %s", w.Code, w.Body)
+	}
+	if w := do(t, h, "GET", "/api/search?q=nonexistent", nil); !strings.Contains(w.Body.String(), `"results":[]`) {
+		t.Errorf("no match must be an empty list, got %s", w.Body)
+	}
+	if w := do(t, h, "GET", "/api/search", nil); w.Code != 200 || !strings.Contains(w.Body.String(), `"results":[]`) {
+		t.Errorf("empty query = %d %s", w.Code, w.Body)
+	}
+}

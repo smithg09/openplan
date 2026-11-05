@@ -215,6 +215,7 @@ separate module from importing `apps/cli/internal/*`. It ships as its own releas
 | `opendocs review <file.html>` | Like `open`, but blocks until the reviewer clicks **Submit review**, then prints open threads as JSON on stdout (status goes to stderr) |
 | `opendocs serve` | Project dashboard server |
 | `opendocs create <file.html>` / `versions <doc>` / `comments <doc>` / `restore <doc> <version-id>` | Store-backed CLI |
+| `opendocs search [--all-projects] [--json] <query>` | Local full-text search over each doc's title + latest version (`internal/opendocs/search`): every word must appear (prefix match on word starts), `"phrases"`, `-exclude`. Flags go **before** the query (`SetInterspersed(false)`, so `-word` isn't read as a flag). Also `GET /api/search?q=` on the local server |
 | `opendocs guidelines` | Prints the HTML authoring contract (`cmd/opendocs/guidelines.md`, embedded); the publish skill tells agents to read it first |
 | `opendocs publish <file> [--proxy URL]` | Upload to an `opendocs-proxy`: first run creates the doc and prints commenter/viewer/**editor** links, later runs add a version to the same doc |
 | `opendocs feedback <file>` | One-shot JSON of open threads for a published file (no blocking; the proxy has no "Submit review" signal) |
@@ -291,6 +292,9 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   `opendocs install`: claude → `~/.claude/skills`, codex → `~/.codex/skills`, agy → `~/.gemini/skills` (global only).
   **Copilot is deliberately unsupported** (no verified skills directory on this machine); `TestSkillsReferenceRealCommands`
   fails if a skill mentions an `opendocs` subcommand that doesn't exist.
+- **Search is local-only by design:** the proxy has no accounts, so there is no "my documents" set to search
+  (a capability link reaches exactly one doc); `TestProxyHasNoSearch` pins that. It scans head versions in
+  memory (fine for a personal doc set); no index, so no Postgres tsvector/SQLite FTS yet.
 - Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search, a
   deployed hosted default (set `remote.HostedURL`).
 

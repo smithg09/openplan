@@ -386,3 +386,12 @@ func TestClientIPTrustProxy(t *testing.T) {
 		t.Errorf("trusted proxy: want last hop 9.9.9.9 (not client-forged), got %s", got)
 	}
 }
+
+func TestProxyHasNoSearch(t *testing.T) {
+	e := newProxyEnv(t)
+	_, editor, _, _ := e.setup()
+	w := e.call(editor, "GET", "/api/search?q=hello", nil)
+	if strings.Contains(w.Body.String(), `"results"`) {
+		t.Errorf("proxy must not expose cross-document search: %s", w.Body)
+	}
+}
