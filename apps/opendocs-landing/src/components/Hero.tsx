@@ -23,7 +23,7 @@ export default function Hero() {
   return (
     <div className="hero">
       <div className="hbadge"><span className="bdot" />For teams that work with agents</div>
-      <h1 className="hh1">Collaborate on the docs<br /><em>your agents write</em></h1>
+      <h1 className="hh1">Agents draft the docs.<br /><em>Your team shapes them.</em></h1>
       <p className="hsub">
         Agents can write great interactive docs: plans, specs, reports, code docs, PR write-ups.
         opendocs gives them a home where your whole team reads, comments and decides together,
