@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Icon, GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
 
-declare const __APP_VERSION__: string;
-
 const AGENTS = [
   { id: 'claude', label: 'Claude Code', iconSrc: '/assets/icon-claude.svg', label2: 'Then run:', steps: ['opendocs install claude', 'Ask: “Write the Q3 launch plan as an opendocs doc”'] },
   { id: 'codex', label: 'Codex', iconSrc: '/assets/icon-codex.png', label2: 'Then run:', steps: ['opendocs install codex', 'Restart Codex, then ask it to publish a doc for review'] },
@@ -24,11 +22,11 @@ export default function Hero() {
   const cmd = 'curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs';
   return (
     <div className="hero">
-      <div className="hbadge"><span className="bdot" />v{__APP_VERSION__} · Open source</div>
-      <h1 className="hh1">Host, review and revise<br /><em>interactive HTML docs</em></h1>
+      <div className="hbadge"><span className="bdot" />A review space for agent-written docs</div>
+      <h1 className="hh1">Your agents write the doc.<br /><em>Your team gets the last word.</em></h1>
       <p className="hsub">
-        A space for agentic collaboration. Your agent publishes plans, specs and reports as HTML,
-        your team comments on the exact words, and the agent ships the next version.
+        opendocs is where plans, specs and reports your agents produce get reviewed. Comment on the exact words,
+        the agent reads your feedback and ships the next version, and every version stays on the record.
       </p>
 
       <div className="hrow">
