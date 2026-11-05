@@ -285,11 +285,19 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   "New version — view" button (it never switches versions under a reader). **In-process only**: one proxy
   instance; several instances would need a shared bus (Postgres LISTEN/NOTIFY / Redis). Tests that open streams
   must register `ts.Close` via `t.Cleanup` *before* the streams (else `httptest.Server.Close` hangs on them).
+- **Local-mode sharing from the UI** (`server/publish.go`, local server only): `GET/POST /api/settings` (proxy URL, validated
+  https-or-localhost), `GET /api/docs/{doc}/remote`, `POST .../publish` (head version → proxy; first time creates the
+  remote doc, later adds a version), `POST .../remote/links {role}` (mints a fresh revocable link). State is keyed
+  `doc:<project>/<slug>` in `~/.opendocs/state.json`; **the editor token never goes to the browser**.
+  UI (`apps/opendocs-ui/src/components/`): `Modal`/`Menu`/`CopyButton`, `ShareModal` (proxy mode: manage links;
+  local mode: publish + copy links), `SettingsModal` (name, theme, proxy). Comment authoring is a **floating
+  "Comment" button → popover over the document**, positioned from the bridge's selection rect (the bridge
+  re-reports it on scroll); the rail only lists threads.
 - **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
   writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
   X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
 - **Hosted deploy:** `Dockerfile.opendocs-proxy` + `render.yaml` (Render web service + Postgres; not yet
-  deployed — needs the user's Render account). `apps/opendocs-landing/` (React+Vite, vanilla CSS, own sapphire `tokens.css`) is the marketing site for Cloudflare Pages
+  deployed — needs the user's Render account). `apps/opendocs-landing/` (React+Vite, vanilla CSS, **same tokens as openplan's landing**) is the marketing site for Cloudflare Pages
   (`.github/workflows/opendocs-site.yml`, needs `CLOUDFLARE_*` secrets and repo var `OPENDOCS_SITE_ENABLED=true`)
   including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
   destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
@@ -352,6 +360,11 @@ binary, same as openplan.
 | `src/components/` | Hero, Nav, FeaturesSection, DemoSection, PageAnnotator, etc. |
 | `src/tokens.css` | Design tokens (separate from main UI) |
 | `src/icons.tsx` | SVG icon components |
+
+The opendocs landing is modelled on the structure of Razorpay's SlashDocs page (narrative statement, agent
+ticker, facts, feature blocks, FAQ) rebuilt in openplan's visual language; the `$ /` wordmark is shared. Its hero is
+a scripted animation (`components/Hero.tsx` stage machine) and `TryIt.tsx` is a working in-page review demo.
+Ticker items and demo copy are illustrative, not real usage data.
 
 Both marketing navs render `SiteSwitcher` from `@openplan/shared` (`packages/shared/src/SiteSwitcher.tsx`): a hover/focus/click dropdown on the product name that links openplan ⇄ opendocs. Add a product to `SITES` there and both navs pick it up.
 
