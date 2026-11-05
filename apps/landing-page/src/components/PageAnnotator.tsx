@@ -4,6 +4,17 @@ import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/t
 import { AnnoCard } from '@openplan/annotations';
 import { CheckSmIcon, CopyIcon, Icon } from '../icons';
 
+// Where the comment card sits for a given highlight rect: under it, or above when it would overflow.
+function cardPosition(rect: DOMRect): { x: number; y: number } {
+  const CARD_W = 280;
+  let x = rect.left + rect.width / 2 - CARD_W / 2;
+  let y = rect.bottom + 8;
+  x = Math.max(12, Math.min(window.innerWidth - CARD_W - 12, x));
+  if (y + 190 > window.innerHeight) y = rect.top - 190 - 8;
+  y = Math.max(12, y);
+  return { x, y };
+}
+
 // ── DOM search and highlight logic ──
 
 function shouldSkipNode(node: Node): boolean {
@@ -254,6 +265,8 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
   const [toast, setToast] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // The live selection's range: the composer follows it as the page scrolls.
+  const selRangeRef = useRef<Range | null>(null);
 
   // Trigger toast timer
   useEffect(() => {
@@ -262,25 +275,55 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Keep the open card glued to its highlight while the page scrolls or resizes.
+  const tooltipId = activeTooltip?.anno.id;
+  useEffect(() => {
+    if (!tooltipId) return;
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = containerRef.current?.querySelector<HTMLElement>(`[data-page-anno-id="${tooltipId}"]`);
+        if (!el) { setActiveTooltip(null); return; }
+        const r = el.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > window.innerHeight) { setActiveTooltip(null); return; } // scrolled out of view
+        const pos = cardPosition(r);
+        setActiveTooltip(t => (t && t.anno.id === tooltipId && (t.pos.x !== pos.x || t.pos.y !== pos.y) ? { ...t, pos } : t));
+      });
+    };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [tooltipId]);
+
+  // The composer (popover) follows the words it is about, too.
+  const composing = !!popover;
+  useEffect(() => {
+    if (!composing) return;
+    let raf = 0;
+    const update = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const range = selRangeRef.current;
+        if (!range) return;
+        const r = range.getBoundingClientRect();
+        const x = Math.max(12, Math.min(window.innerWidth - 332, r.left + r.width / 2 - 160));
+        const y = Math.max(12, Math.min(window.innerHeight - 240, r.bottom + 10));
+        setPopover(p => (p && (p.pos.x !== x || p.pos.y !== y) ? { ...p, pos: { x, y } } : p));
+      });
+    };
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('scroll', update, true); window.removeEventListener('resize', update); };
+  }, [composing]);
+
   // Handle click on highlight mark to show tooltip card
   const handleHighlightClick = (id: string, element: HTMLElement) => {
     if (!showHighlights) return;
     const anno = annotations.find(a => a.id === id);
     if (!anno) return;
 
-    const rect = element.getBoundingClientRect();
-    const CARD_W = 280;
-    let x = rect.left + rect.width / 2 - CARD_W / 2;
-    let y = rect.bottom + 8;
-
-    x = Math.max(12, Math.min(window.innerWidth - CARD_W - 12, x));
-
-    // Ensure it fits vertically, else place above the highlight
-    if (y + 190 > window.innerHeight) {
-      y = rect.top - 190 - 8;
-    }
-    y = Math.max(12, y);
-
+    const { x, y } = cardPosition(element.getBoundingClientRect());
     setActiveTooltip({ anno, pos: { x, y } });
   };
 
@@ -323,6 +366,7 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
         }
 
         const range = sel.getRangeAt(0);
+        selRangeRef.current = range.cloneRange();
         const rect = range.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) return;
 
@@ -338,7 +382,7 @@ export default function PageAnnotator({ children, theme }: PageAnnotatorProps) {
     };
 
     const handleScroll = () => {
-      // Clear selection toolbars on scroll to avoid orphan elements
+      // The bare toolbar is dropped on scroll (it would float away from the text); the composer follows instead.
       setSelectionState(null);
     };
 
