@@ -77,7 +77,7 @@ func (s *Server) guard(act auth.Action, h authedHandler) http.HandlerFunc {
 			writeErr(w, http.StatusForbidden, fmt.Errorf("a %s link cannot do this", p.role))
 			return
 		}
-		h(w, r, p)
+		s.publishAfter(w, r, func(w http.ResponseWriter) { h(w, r, p) })
 	}
 }
 

@@ -124,3 +124,44 @@ export const api = {
 export function frameURL(doc: string, versionId: string): string {
   return `/api/docs/${encodeURIComponent(doc)}/versions/${versionId}/frame`;
 }
+
+export type LiveEvent = { type: 'comments' | 'versions' | 'presence'; count?: number };
+
+/**
+ * Subscribe to change notifications for a document (Server-Sent Events over
+ * fetch, because EventSource cannot send the Authorization header). Events carry
+ * no content — callers refetch through the normal API. Reconnects with backoff
+ * until `signal` aborts. Returns once aborted.
+ */
+export async function subscribe(doc: string, onEvent: (e: LiveEvent) => void, signal: AbortSignal): Promise<void> {
+  let delay = 1000;
+  while (!signal.aborted) {
+    try {
+      const headers: Record<string, string> = { Accept: 'text/event-stream' };
+      if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+      const res = await fetch(`/api/docs/${encodeURIComponent(doc)}/events`, { headers, signal });
+      if (res.status === 401 || res.status === 403) return; // not allowed: don't retry
+      if (!res.ok || !res.body) throw new Error(String(res.status));
+      delay = 1000;
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += value;
+        let i: number;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          const line = frame.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue; // keepalive comment
+          try { onEvent(JSON.parse(line.slice(6)) as LiveEvent); } catch { /* ignore malformed */ }
+        }
+      }
+    } catch {
+      if (signal.aborted) return;
+    }
+    await new Promise((r) => setTimeout(r, delay));
+    delay = Math.min(delay * 2, 15000);
+  }
+}

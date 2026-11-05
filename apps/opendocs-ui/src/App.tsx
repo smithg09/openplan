@@ -1,6 +1,6 @@
 import React from 'react';
 import { AnnoCard } from '@openplan/annotations';
-import { api, captureToken, docFromPath, frameURL, loadToken, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
+import { api, captureToken, docFromPath, frameURL, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
 
 /** Messages from the in-iframe bridge. */
@@ -27,6 +27,8 @@ export default function App() {
   const [role, setRole] = React.useState<Role>('editor');
   const [frameSrc, setFrameSrc] = React.useState('');
   const [frameHtml, setFrameHtml] = React.useState('');
+  const [viewers, setViewers] = React.useState(0);
+  const [newVersion, setNewVersion] = React.useState(false);
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const me = React.useMemo(() => localAuthor(), []);
@@ -126,6 +128,26 @@ export default function App() {
     [postToFrame],
   );
 
+  // Live updates: another person commenting or publishing shows up without a reload.
+  React.useEffect(() => {
+    if (!docSlug) return;
+    const ac = new AbortController();
+    void subscribe(docSlug, (ev) => {
+      if (ev.type === 'presence') setViewers(ev.count ?? 0);
+      if (ev.type === 'comments') void refreshComments(docSlug).then(repaint).catch(() => {});
+      if (ev.type === 'versions') {
+        void api.listVersions(docSlug).then(({ versions }) => {
+          const vs = versions ?? [];
+          setVersions(vs);
+          // Don't yank the page out from under a reader; offer the switch instead.
+          if (vs.length && vs[vs.length - 1].id !== versionRef.current) setNewVersion(true);
+        }).catch(() => {});
+      }
+    }, ac.signal);
+    return () => ac.abort();
+  }, [docSlug, refreshComments, repaint]);
+
+
   React.useEffect(() => {
     function onMessage(ev: MessageEvent) {
       // Sandboxed iframe has an opaque origin ("null"), so filter by source.
@@ -218,6 +240,7 @@ export default function App() {
             onChange={(e) => {
               setCurrentVersionId(e.target.value);
               setOrphans(new Set());
+              if (versions.length && e.target.value === versions[versions.length - 1].id) setNewVersion(false);
             }}
           >
             {versions.map((v, i) => (
@@ -227,6 +250,12 @@ export default function App() {
               </option>
             ))}
           </select>
+        )}
+        {viewers > 1 && <span className="od-role" title="People viewing this document right now">{viewers} here</span>}
+        {newVersion && (
+          <button className="od-btn od-btn-ghost" onClick={() => { const last = versions[versions.length - 1]; if (last) { setCurrentVersionId(last.id); setOrphans(new Set()); } setNewVersion(false); }}>
+            New version — view
+          </button>
         )}
         {mode === 'proxy' && <span className="od-role" title="What this link allows">{role}</span>}
         {mode === 'local' && <button

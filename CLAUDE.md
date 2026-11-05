@@ -277,6 +277,14 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   must be 0). For sqlite/postgres, **capability grants live in the DB too** (`sqlstore.Grants()`), so an
   ephemeral-disk host keeps share links across deploys; `fs` uses `grants.json`. Signing key: `$OPENDOCS_SIGNING_KEY`
   or `--data/signing.key`.
+- **Live updates** (`server/live.go`): `GET /api/docs/{doc}/events` (viewer+, SSE; both local and proxy mode)
+  streams `{"type":"comments"|"versions"|"presence","count"?}`. Events say only *that* something changed — clients
+  refetch through the normal authorised API, so the stream never carries content. Published by `guard()` only
+  after a mutation returns <300; coalesced per subscriber; 100 streams/doc cap; 25 s keepalive. The UI uses
+  `fetch` streaming (EventSource can't send `Authorization`), repaints comments, shows "N here" and a
+  "New version — view" button (it never switches versions under a reader). **In-process only**: one proxy
+  instance; several instances would need a shared bus (Postgres LISTEN/NOTIFY / Redis). Tests that open streams
+  must register `ts.Close` via `t.Cleanup` *before* the streams (else `httptest.Server.Close` hangs on them).
 - **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
   writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
   X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.

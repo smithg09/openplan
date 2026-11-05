@@ -41,6 +41,7 @@ type Server struct {
 	// Proxy mode (nil/unset for the local server): see access.go.
 	grants   auth.Grants
 	signer   *auth.Signer
+	hub      *hub
 	limits   Limits
 	createRL *rateLimiter
 	writeRL  *rateLimiter
@@ -53,7 +54,7 @@ type Server struct {
 
 // New returns a Server scoped to a project within the store.
 func New(st store.Backend, project, version string) *Server {
-	return &Server{store: st, project: project, version: version, done: make(chan struct{})}
+	return &Server{store: st, project: project, version: version, done: make(chan struct{}), hub: newHub()}
 }
 
 // Done is closed once the reviewer submits their review in the UI. The
@@ -80,6 +81,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
 		mux.HandleFunc("GET /api/search", s.handleSearch)
 	}
+	mux.HandleFunc("GET /api/docs/{doc}/events", s.guard(auth.ActRead, s.handleEvents))
 	mux.HandleFunc("GET /api/docs/{doc}/access", s.guard(auth.ActRead, s.handleAccess))
 	mux.HandleFunc("GET /api/docs/{doc}/versions", s.guard(auth.ActRead, s.handleListVersions))
 	mux.HandleFunc("POST /api/docs/{doc}/versions", s.guard(auth.ActWrite, s.handleCreateVersion))
