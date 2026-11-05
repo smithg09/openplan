@@ -1,0 +1,25 @@
+name: Deploy opendocs site (Cloudflare Pages)
+
+# Needs repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and a Pages
+# project named "opendocs". Point opendocs.smithgajjar.dev at it in Cloudflare.
+on:
+  push:
+    branches: [main]
+    paths: ["apps/opendocs-site/**", ".github/workflows/opendocs-site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.OPENDOCS_SITE_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/opendocs-site --project-name=opendocs

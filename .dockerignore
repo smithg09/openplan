@@ -1,0 +1,4 @@
+**/node_modules
+.git
+bin
+apps/landing-page/dist
