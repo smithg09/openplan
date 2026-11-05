@@ -38,8 +38,11 @@ type Server struct {
 	version string
 
 	// Proxy mode (nil/unset for the local server): see access.go.
-	grants auth.Grants
-	signer *auth.Signer
+	grants   auth.Grants
+	signer   *auth.Signer
+	limits   Limits
+	createRL *rateLimiter
+	writeRL  *rateLimiter
 
 	httpSrv *http.Server
 
@@ -64,6 +67,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/session", s.handleSession)
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, map[string]any{"ok": true}) })
 	if s.multiTenant() {
 		// Opaque server-minted ids; no listing of other people's documents.
 		mux.HandleFunc("POST /api/docs", s.handleCreateDoc)
@@ -88,7 +92,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/docs/{doc}/comments/{id}", s.guard(auth.ActModifyOwn, s.handleDeleteComment))
 
 	mux.Handle("/", s.uiHandler())
-	return guardWrites(mux)
+	return s.limitWrites(guardWrites(mux))
 }
 
 // maxBodyBytes caps request bodies (a document version is the largest payload).
@@ -208,6 +212,12 @@ func (s *Server) handleCreateVersion(w http.ResponseWriter, r *http.Request, _ p
 		writeErr(w, http.StatusBadRequest, err)
 		return
 	}
+	if s.limits.MaxVersions > 0 {
+		if vs, err := s.doc(r).ListVersions(); err == nil && len(vs) >= s.limits.MaxVersions {
+			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("version limit reached for this document"))
+			return
+		}
+	}
 	v, err := s.doc(r).CreateVersion([]byte(req.HTML), req.ExpectedHead, req.Label, req.Summary)
 	if errors.Is(err, store.ErrConflict) {
 		writeErr(w, http.StatusConflict, err)
@@ -283,6 +293,16 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request, p prin
 		return
 	}
 	c.Owner = p.hash // never trust a client-supplied owner
+	if s.limits.MaxCommentLen > 0 && len(c.Body) > s.limits.MaxCommentLen {
+		writeErr(w, http.StatusRequestEntityTooLarge, errors.New("comment too long"))
+		return
+	}
+	if s.limits.MaxComments > 0 {
+		if cs, err := s.doc(r).ListComments(); err == nil && len(cs) >= s.limits.MaxComments {
+			writeErr(w, http.StatusRequestEntityTooLarge, errors.New("comment limit reached for this document"))
+			return
+		}
+	}
 	saved, err := s.doc(r).AddComment(c)
 	if errors.Is(err, store.ErrNotFound) {
 		writeErr(w, http.StatusBadRequest, err)

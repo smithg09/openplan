@@ -1,11 +1,11 @@
-// Package sqlstore is a SQLite-backed store.Backend for the self-hosted
+// Package sqlstore is a SQL-backed store.Backend (SQLite or PostgreSQL) for
 // opendocs-proxy. It lives in its own package, imported only by
-// cmd/opendocs-proxy, so the pure-Go SQLite driver is never linked into the
+// cmd/opendocs-proxy, so the database drivers are never linked into the
 // openplan or opendocs binaries.
 //
-// One process owns the database file; writes are serialised through a single
-// connection, and every mutation runs in a transaction, so optimistic-concurrency
-// (If-Match) checks are atomic.
+// Every mutation runs in a transaction. SQLite serialises through a single
+// connection; PostgreSQL locks the document row (SELECT ... FOR UPDATE), so
+// optimistic-concurrency (If-Match) checks are atomic in both.
 package sqlstore
 
 import (
@@ -19,12 +19,16 @@ import (
 	"net/url"
 	"time"
 
+	"strconv"
+	"strings"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
 
-const schema = `
+const schemaTmpl = `
 CREATE TABLE IF NOT EXISTS docs (
   project TEXT NOT NULL,
   doc     TEXT NOT NULL,
@@ -35,11 +39,11 @@ CREATE TABLE IF NOT EXISTS blobs (
   project TEXT NOT NULL,
   doc     TEXT NOT NULL,
   hash    TEXT NOT NULL,
-  content BLOB NOT NULL,
+  content {{BLOB}} NOT NULL,
   PRIMARY KEY (project, doc, hash)
 );
 CREATE TABLE IF NOT EXISTS versions (
-  n            INTEGER PRIMARY KEY AUTOINCREMENT,
+  n            {{SERIAL}},
   project      TEXT NOT NULL,
   doc          TEXT NOT NULL,
   id           TEXT NOT NULL,
@@ -50,8 +54,16 @@ CREATE TABLE IF NOT EXISTS versions (
   summary      TEXT NOT NULL DEFAULT '',
   UNIQUE (project, doc, id)
 );
+CREATE TABLE IF NOT EXISTS grants (
+  doc        TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  role       TEXT NOT NULL,
+  label      TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (doc, token_hash)
+);
 CREATE TABLE IF NOT EXISTS comments (
-  n       INTEGER PRIMARY KEY AUTOINCREMENT,
+  n       {{SERIAL}},
   project TEXT NOT NULL,
   doc     TEXT NOT NULL,
   id      TEXT NOT NULL,
@@ -61,13 +73,69 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 `
 
-// DB is a SQLite-backed store.Backend.
-type DB struct{ db *sql.DB }
+// dialect captures the small SQL differences between the supported databases.
+type dialect struct {
+	name      string
+	blob      string
+	serial    string
+	numbered  bool   // placeholders are $1,$2 rather than ?
+	forUpdate string // appended to the head lookup to lock the document row
+}
+
+var (
+	sqliteDialect = dialect{name: "sqlite", blob: "BLOB", serial: "INTEGER PRIMARY KEY AUTOINCREMENT"}
+	pgDialect     = dialect{name: "postgres", blob: "BYTEA", serial: "BIGSERIAL PRIMARY KEY", numbered: true, forUpdate: " FOR UPDATE"}
+)
+
+func (d dialect) schema() string {
+	return strings.NewReplacer("{{BLOB}}", d.blob, "{{SERIAL}}", d.serial).Replace(schemaTmpl)
+}
+
+// rebind rewrites ? placeholders to $n for numbered dialects.
+func (d dialect) rebind(q string) string {
+	if !d.numbered {
+		return q
+	}
+	var b strings.Builder
+	n := 0
+	for _, r := range q {
+		if r == '?' {
+			n++
+			b.WriteString("$" + strconv.Itoa(n))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// rdb and rtx rebind placeholders so every query is written once with `?`.
+type rdb struct {
+	*sql.DB
+	d dialect
+}
+
+func (r *rdb) Query(q string, a ...any) (*sql.Rows, error) { return r.DB.Query(r.d.rebind(q), a...) }
+func (r *rdb) QueryRow(q string, a ...any) *sql.Row        { return r.DB.QueryRow(r.d.rebind(q), a...) }
+
+type rtx struct {
+	*sql.Tx
+	d dialect
+}
+
+func (r *rtx) Exec(q string, a ...any) (sql.Result, error) { return r.Tx.Exec(r.d.rebind(q), a...) }
+func (r *rtx) QueryRow(q string, a ...any) *sql.Row        { return r.Tx.QueryRow(r.d.rebind(q), a...) }
+
+// DB is a SQL-backed store.Backend.
+type DB struct{ db *rdb }
 
 var _ store.Backend = (*DB)(nil)
 
-// Open opens (creating if needed) the database at path.
-func Open(path string) (*DB, error) {
+// Open opens (creating if needed) the SQLite database at path.
+func Open(path string) (*DB, error) { return OpenSQLite(path) }
+
+// OpenSQLite opens (creating if needed) the SQLite database at path.
+func OpenSQLite(path string) (*DB, error) {
 	q := url.Values{}
 	q.Add("_pragma", "busy_timeout(5000)")
 	q.Add("_pragma", "journal_mode(WAL)")
@@ -79,11 +147,25 @@ func Open(path string) (*DB, error) {
 	// A single connection serialises all access: a transaction holds it, so
 	// check-then-write sequences cannot interleave.
 	db.SetMaxOpenConns(1)
-	if _, err := db.Exec(schema); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("sqlstore: init schema: %w", err)
+	return initDB(db, sqliteDialect)
+}
+
+// OpenPostgres connects to a PostgreSQL database (a postgres:// DSN).
+func OpenPostgres(dsn string) (*DB, error) {
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, err
 	}
-	return &DB{db: db}, nil
+	db.SetMaxOpenConns(10)
+	return initDB(db, pgDialect)
+}
+
+func initDB(db *sql.DB, d dialect) (*DB, error) {
+	if _, err := db.Exec(d.schema()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("sqlstore: init %s schema: %w", d.name, err)
+	}
+	return &DB{db: &rdb{DB: db, d: d}}, nil
 }
 
 // Close releases the database.
@@ -111,7 +193,7 @@ func (d *DB) ListDocs(project string) ([]string, error) {
 }
 
 type docStore struct {
-	db           *sql.DB
+	db           *rdb
 	project, doc string
 }
 
@@ -124,20 +206,20 @@ func newID() string {
 func now() string { return time.Now().UTC().Format(time.RFC3339) }
 
 // tx runs fn in a transaction, committing on nil and rolling back otherwise.
-func (s *docStore) tx(fn func(*sql.Tx) error) error {
-	tx, err := s.db.Begin()
+func (s *docStore) tx(fn func(*rtx) error) error {
+	stx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
-	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
+	if err := fn(&rtx{Tx: stx, d: s.db.d}); err != nil {
+		_ = stx.Rollback()
 		return err
 	}
-	return tx.Commit()
+	return stx.Commit()
 }
 
-func (s *docStore) ensureDoc(tx *sql.Tx) error {
-	_, err := tx.Exec(`INSERT OR IGNORE INTO docs (project, doc) VALUES (?, ?)`, s.project, s.doc)
+func (s *docStore) ensureDoc(tx *rtx) error {
+	_, err := tx.Exec(`INSERT INTO docs (project, doc) VALUES (?, ?) ON CONFLICT DO NOTHING`, s.project, s.doc)
 	return err
 }
 
@@ -145,12 +227,12 @@ func (s *docStore) ensureDoc(tx *sql.Tx) error {
 
 func (s *docStore) CreateVersion(content []byte, expectedHead, label, summary string) (store.Version, error) {
 	var v store.Version
-	err := s.tx(func(tx *sql.Tx) error {
+	err := s.tx(func(tx *rtx) error {
 		if err := s.ensureDoc(tx); err != nil {
 			return err
 		}
 		var head string
-		if err := tx.QueryRow(`SELECT head FROM docs WHERE project = ? AND doc = ?`, s.project, s.doc).Scan(&head); err != nil {
+		if err := tx.QueryRow(`SELECT head FROM docs WHERE project = ? AND doc = ?`+s.db.d.forUpdate, s.project, s.doc).Scan(&head); err != nil {
 			return err
 		}
 		if expectedHead != "" && expectedHead != head {
@@ -158,7 +240,7 @@ func (s *docStore) CreateVersion(content []byte, expectedHead, label, summary st
 		}
 		sum := sha256.Sum256(content)
 		hash := hex.EncodeToString(sum[:])
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO blobs (project, doc, hash, content) VALUES (?, ?, ?, ?)`,
+		if _, err := tx.Exec(`INSERT INTO blobs (project, doc, hash, content) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING`,
 			s.project, s.doc, hash, content); err != nil {
 			return err
 		}
@@ -274,7 +356,7 @@ func (s *docStore) AddComment(c store.Comment) (store.Comment, error) {
 	if c.CreatedAt == "" {
 		c.CreatedAt = now()
 	}
-	err := s.tx(func(tx *sql.Tx) error {
+	err := s.tx(func(tx *rtx) error {
 		if c.RootCommentID != "" {
 			var one int
 			err := tx.QueryRow(`SELECT 1 FROM comments WHERE project = ? AND doc = ? AND id = ?`,
@@ -305,7 +387,7 @@ func (s *docStore) AddComment(c store.Comment) (store.Comment, error) {
 
 // update loads comment id, applies mutate, and writes it back atomically.
 func (s *docStore) update(id string, mutate func(*store.Comment)) error {
-	return s.tx(func(tx *sql.Tx) error {
+	return s.tx(func(tx *rtx) error {
 		var data string
 		err := tx.QueryRow(`SELECT data FROM comments WHERE project = ? AND doc = ? AND id = ?`, s.project, s.doc, id).Scan(&data)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -341,7 +423,7 @@ func (s *docStore) EditComment(id, body string) error {
 }
 
 func (s *docStore) DeleteComment(id string) error {
-	return s.tx(func(tx *sql.Tx) error {
+	return s.tx(func(tx *rtx) error {
 		res, err := tx.Exec(`DELETE FROM comments WHERE project = ? AND doc = ? AND (id = ? OR root = ?)`, s.project, s.doc, id, id)
 		if err != nil {
 			return err

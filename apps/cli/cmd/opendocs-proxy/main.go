@@ -34,9 +34,11 @@ func main() {
 }
 
 var (
-	addr      string
-	dataDir   string
-	storeKind string
+	addr        string
+	dataDir     string
+	storeKind   string
+	databaseURL string
+	limits      = server.DefaultLimits()
 )
 
 var rootCmd = &cobra.Command{
@@ -49,12 +51,26 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Version = version
-	rootCmd.Flags().StringVar(&addr, "addr", "127.0.0.1:7435", "listen address (use 0.0.0.0:PORT to expose; put TLS in front)")
-	rootCmd.Flags().StringVar(&storeKind, "store", "sqlite", "document storage: sqlite (default) or fs (plain files)")
+	rootCmd.Flags().StringVar(&addr, "addr", defaultAddr(), "listen address (use 0.0.0.0:PORT to expose; put TLS in front). Defaults to 0.0.0.0:$PORT when PORT is set")
+	rootCmd.Flags().IntVar(&limits.CreatePerHour, "create-per-hour", limits.CreatePerHour, "max new documents per client IP per hour (0 = unlimited)")
+	rootCmd.Flags().IntVar(&limits.WritePerMin, "writes-per-min", limits.WritePerMin, "max other writes per client IP per minute (0 = unlimited)")
+	rootCmd.Flags().BoolVar(&limits.TrustProxy, "trust-proxy", false, "take client IP from the last X-Forwarded-For hop (only behind your own reverse proxy)")
+	rootCmd.Flags().StringVar(&storeKind, "store", "sqlite", "document storage: sqlite (default), postgres, or fs (plain files)")
+	rootCmd.Flags().StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "PostgreSQL connection URL for --store postgres (default $DATABASE_URL)")
 	rootCmd.Flags().StringVar(&dataDir, "data", defaultDataDir(), "directory for documents, grants and the signing key")
 }
 
+func defaultAddr() string {
+	if p := os.Getenv("PORT"); p != "" {
+		return "0.0.0.0:" + p
+	}
+	return "127.0.0.1:7435"
+}
+
 func defaultDataDir() string {
+	if d := os.Getenv("OPENDOCS_DATA"); d != "" {
+		return d
+	}
 	if h, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(h, ".opendocs-proxy")
 	}
@@ -65,33 +81,54 @@ func run(cmd *cobra.Command, _ []string) error {
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return err
 	}
-	key, err := auth.LoadOrCreateKey(filepath.Join(dataDir, "signing.key"))
-	if err != nil {
-		return err
+	// The signing key can come from the environment (hosted deploys with an
+	// ephemeral disk) or a file under --data.
+	var key []byte
+	if k := os.Getenv("OPENDOCS_SIGNING_KEY"); k != "" {
+		key = []byte(k)
+	} else {
+		var err error
+		if key, err = auth.LoadOrCreateKey(filepath.Join(dataDir, "signing.key")); err != nil {
+			return err
+		}
 	}
 	signer, err := auth.NewSigner(key)
 	if err != nil {
 		return err
 	}
-	grants := auth.NewFileGrants(filepath.Join(dataDir, "grants.json"))
-	var st store.Backend
+
+	var (
+		st     store.Backend
+		grants auth.Grants
+	)
 	switch storeKind {
 	case "sqlite":
-		db, err := sqlstore.Open(filepath.Join(dataDir, "opendocs.db"))
+		db, err := sqlstore.OpenSQLite(filepath.Join(dataDir, "opendocs.db"))
 		if err != nil {
 			return err
 		}
 		defer db.Close()
-		st = db
+		st, grants = db, db.Grants()
+	case "postgres":
+		if databaseURL == "" {
+			return fmt.Errorf("--store postgres needs --database-url or $DATABASE_URL")
+		}
+		db, err := sqlstore.OpenPostgres(databaseURL)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		st, grants = db, db.Grants()
 	case "fs":
 		st = store.NewWithBase(filepath.Join(dataDir, "docs")).Backend()
+		grants = auth.NewFileGrants(filepath.Join(dataDir, "grants.json"))
 	default:
-		return fmt.Errorf("unknown --store %q (want sqlite or fs)", storeKind)
+		return fmt.Errorf("unknown --store %q (want sqlite, postgres or fs)", storeKind)
 	}
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.NewProxy(st, grants, signer, version).Handler(),
+		Handler:           server.NewProxy(st, grants, signer, version).WithLimits(limits).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,
