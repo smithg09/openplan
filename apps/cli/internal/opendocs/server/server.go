@@ -31,7 +31,7 @@ var uiFS embed.FS
 // Server serves the review UI and the DocsBackend-shaped JSON API for one
 // project's documents.
 type Server struct {
-	store   *store.Store
+	store   store.Backend
 	project string
 	focus   string // document slug to open first (for `opendocs open`), optional
 	version string
@@ -43,7 +43,7 @@ type Server struct {
 }
 
 // New returns a Server scoped to a project within the store.
-func New(st *store.Store, project, version string) *Server {
+func New(st store.Backend, project, version string) *Server {
 	return &Server{store: st, project: project, version: version, done: make(chan struct{})}
 }
 
@@ -142,7 +142,7 @@ func listen(port int) (net.Listener, error) {
 
 // ── API handlers ────────────────────────────────────────────────────────────
 
-func (s *Server) doc(r *http.Request) *store.Doc {
+func (s *Server) doc(r *http.Request) store.DocStore {
 	return s.store.Doc(s.project, r.PathValue("doc"))
 }
 

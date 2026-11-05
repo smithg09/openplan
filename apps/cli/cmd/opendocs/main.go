@@ -172,7 +172,7 @@ var openCmd = &cobra.Command{
 			return err
 		}
 
-		srv := server.New(store.New(), project, version)
+		srv := server.New(store.New().Backend(), project, version)
 		srv.SetFocus(docSlug)
 		return ignoreInterrupt(runServer(cmd, srv, "/?doc="+docSlug, false))
 	},
@@ -183,7 +183,7 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the local review server",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		srv := server.New(store.New(), projectSlug(), version)
+		srv := server.New(store.New().Backend(), projectSlug(), version)
 		return ignoreInterrupt(runServer(cmd, srv, "/", false))
 	},
 }
@@ -345,7 +345,7 @@ var reviewCmd = &cobra.Command{
 			return err
 		}
 
-		srv := server.New(store.New(), project, version)
+		srv := server.New(store.New().Backend(), project, version)
 		srv.SetFocus(docSlug)
 		if err := runServer(cmd, srv, "/?doc="+docSlug, true); err != nil {
 			if errors.Is(err, errInterrupted) {

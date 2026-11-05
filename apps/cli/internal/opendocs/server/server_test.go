@@ -14,7 +14,7 @@ import (
 func newTestServer(t *testing.T) (*Server, *store.Doc) {
 	t.Helper()
 	st := store.NewWithBase(t.TempDir())
-	s := New(st, "proj", "test")
+	s := New(st.Backend(), "proj", "test")
 	return s, st.Doc("proj", "report")
 }
 
