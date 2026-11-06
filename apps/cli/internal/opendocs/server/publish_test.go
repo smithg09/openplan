@@ -182,3 +182,27 @@ func TestPublishCarriesLocalCommentsAcrossOnce(t *testing.T) {
 		t.Errorf("remote has %d comments after republish, want 3", len(all))
 	}
 }
+
+func TestRepublishRecoversWhenTheProxyLostTheDocument(t *testing.T) {
+	s, ts, st := localWithProxy(t)
+	h := s.Handler()
+	t.Setenv("OPENDOCS_PROXY", "")
+	noHosted(t)
+
+	first := decode[map[string]any](t, do(t, h, "POST", "/api/docs/report/publish", map[string]string{"proxy": ts.URL}))
+	p, _, _ := st.Lookup("doc:proj/report")
+	p.EditorToken = "no-longer-valid" // as if the proxy's storage had been reset
+	if err := st.Remember("doc:proj/report", p); err != nil {
+		t.Fatal(err)
+	}
+	if w := do(t, h, "POST", "/api/docs/report/remote/links", map[string]string{"role": "viewer"}); w.Code != 409 || !strings.Contains(w.Body.String(), "publish it again") {
+		t.Errorf("link for a lost document = %d %s", w.Code, w.Body)
+	}
+	again := decode[map[string]any](t, do(t, h, "POST", "/api/docs/report/publish", map[string]string{}))
+	if again["new"] != true || again["id"] == first["id"] {
+		t.Fatalf("expected a fresh remote document, got %v", again)
+	}
+	if w := do(t, h, "POST", "/api/docs/report/remote/links", map[string]string{"role": "viewer"}); w.Code != 200 {
+		t.Errorf("link after republish = %d %s", w.Code, w.Body)
+	}
+}

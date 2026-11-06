@@ -23,7 +23,7 @@ export default function Hero() {
   return (
     <div className="hero">
       <div className="hbadge"><span className="bdot" />For teams that work with agents</div>
-      <h1 className="hh1">Agents draft the docs.<br /><em>Your team shapes them.</em></h1>
+      <h1 className="hh1">Agents draft the docs.<br />Your team<br /><em>shapes them.</em></h1>
       <p className="hsub">
         Agents can write great interactive docs: plans, specs, reports, code docs, PR write-ups.
         opendocs gives them a home where your whole team reads, comments and decides together,
@@ -49,7 +49,8 @@ export default function Hero() {
       </div>
 
       <div className="hctas">
-        <a href="#demo" className="btnp">Try the review UI <Icon name="arrow_down" size={14} /></a>
+        <a href="/app/" className="btnp">Open the app <Icon name="arrow_right" size={14} /></a>
+        <a href="#demo" className="btno">See the review UI <Icon name="arrow_down" size={14} /></a>
         <a href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" className="btno"><GithubIcon /> View on GitHub</a>
       </div>
     </div>

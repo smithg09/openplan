@@ -96,6 +96,16 @@ func (c *Client) do(method, path, token string, in, out any) error {
 	return nil
 }
 
+// IsGone reports whether err means the proxy no longer knows this document or
+// token (401/404) — e.g. the proxy's storage was reset since it was published.
+func IsGone(err error) bool {
+	if err == nil {
+		return false
+	}
+	m := err.Error()
+	return strings.Contains(m, ": 401 ") || strings.Contains(m, ": 404 ")
+}
+
 // Created is the result of creating a document.
 type Created struct {
 	ID          string         `json:"id"`
