@@ -7,6 +7,9 @@ import {
   CodeSquareIcon, Download04Icon, GlobeIcon, LinkSquare02Icon, User03Icon, LeftToRightListBulletIcon,
   Folder01Icon, ComputerTerminal01Icon, SourceCodeIcon, RoboticIcon, FlashIcon, DashboardSquare01Icon,
   UndoIcon, Copy01Icon, ViewIcon, ViewOffIcon, Alert02Icon,
+  GitBranchIcon, Clock01Icon, FullScreenIcon, SidebarRightIcon, SidebarLeftIcon, PrinterIcon, KeyboardIcon,
+  Upload04Icon, ArrowLeft01Icon, ArrowDown01Icon, FolderOpenIcon, Search01Icon, MoreHorizontalIcon,
+  FileExportIcon, PdfIcon, Add01Icon, Refresh01Icon, NotificationOff01Icon, Settings02Icon, GithubIcon, ArrowRight01Icon,
 } from '@hugeicons/core-free-icons';
 
 export const ANNOTATION_TYPES: Record<string, { label: string; colorVar: string; letter: string }> = {
@@ -64,6 +67,28 @@ const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
   visibility: ViewIcon,
   visibility_off: ViewOffIcon,
   warning: Alert02Icon,
+  history: GitBranchIcon,
+  schedule: Clock01Icon,
+  fullscreen: FullScreenIcon,
+  panel_right: SidebarRightIcon,
+  panel_left: SidebarLeftIcon,
+  print: PrinterIcon,
+  keyboard: KeyboardIcon,
+  upload: Upload04Icon,
+  arrow_back: ArrowLeft01Icon,
+  expand_more: ArrowDown01Icon,
+  folder_open: FolderOpenIcon,
+  search: Search01Icon,
+  more_horiz: MoreHorizontalIcon,
+  export: FileExportIcon,
+  pdf: PdfIcon,
+  add: Add01Icon,
+  refresh: Refresh01Icon,
+  notifications_off: NotificationOff01Icon,
+  settings: Settings02Icon,
+  github: GithubIcon,
+  arrow_right: ArrowRight01Icon,
+  arrow_down: ArrowDown01Icon,
 };
 
 const SCALE = 1.05;

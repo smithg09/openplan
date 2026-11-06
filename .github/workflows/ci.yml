@@ -26,6 +26,14 @@ jobs:
   build:
     name: Full Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: pw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,3 +60,32 @@ jobs:
 
       - name: Verify binary
         run: ./bin/openplan --version
+
+      - name: Build opendocs UI
+        run: bun run build:opendocs-ui
+
+      - name: Build opendocs
+        run: |
+          cd apps/cli
+          go build -ldflags="-s -w" -o ../../bin/opendocs ./cmd/opendocs
+
+      - name: Verify opendocs binary
+        run: ./bin/opendocs --version
+
+      - name: Build opendocs-proxy
+        run: |
+          cd apps/cli
+          go build -ldflags="-s -w" -o ../../bin/opendocs-proxy ./cmd/opendocs-proxy
+
+      - name: Verify opendocs-proxy binary
+        run: ./bin/opendocs-proxy --version
+
+      - name: Go tests (incl. PostgreSQL store contract)
+        env:
+          OPENDOCS_TEST_PG_DSN: postgres://postgres:pw@localhost:5432/postgres?sslmode=disable
+        run: |
+          cd apps/cli
+          go test ./...
+
+      - name: Build opendocs-proxy image
+        run: docker build -f Dockerfile.opendocs-proxy -t opendocs-proxy:ci .

@@ -23,6 +23,18 @@
 
 Openplan hooks into Claude Code's **plan mode** workflow. When Claude finishes planning and triggers `ExitPlanMode`, Openplan intercepts the event, opens the plan in a browser UI, and lets you **review, annotate, and version** the plan before sending your approve or deny decision back to Claude Code.
 
+## Also in this repo: opendocs
+
+**opendocs** reviews the rich **HTML documents** agents write: they publish a self-contained HTML file, people comment on the exact words, and every version is kept. Local-first, with an optional self-hostable proxy and a hosted web app at **[opendocs.smithgajjar.dev/app](https://opendocs.smithgajjar.dev/app/)** (try the sample, open a local folder, or open a shared link).
+
+```bash
+curl -fsSL https://openplan.smithgajjar.dev/install.sh | bash -s opendocs
+opendocs install claude   # or codex | agy: installs the agent skill
+opendocs demo             # open the bundled interactive sample
+```
+
+See [CLAUDE.md](CLAUDE.md) for how the pieces fit together.
+
 ## Installation
 
 Install the binary:

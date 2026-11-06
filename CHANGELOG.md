@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-05
+
+### Added
+
+- **opendocs** — a sibling product for reviewing rich **HTML documents** agents write: comment on the exact words, every version kept, local-first. Ships as two new binaries alongside `openplan`:
+  - `opendocs` — `open`, `review`, `demo`, `create`, `versions`, `comments`, `restore`, `search`, `guidelines`, `publish`, `feedback`, `config proxy`, and `install <claude|codex|agy>` (writes a single `opendocs` skill)
+  - `opendocs-proxy` — a self-hostable multi-tenant server with capability links (viewer / commenter / editor), signed expiring frame URLs, per-IP rate limits and per-document quotas, SQLite or PostgreSQL storage, live comment/version updates and presence over SSE, and an opt-in CORS allow-list for the hosted web app
+- **Hosted web app** at `opendocs.smithgajjar.dev/app` — try the sample document, open a local folder of HTML files, or open a shared `/d/<id>#t=<token>` link, with documents kept in the browser (IndexedDB) and sharing through the hosted proxy
+- **Review UI** built on openplan's chrome: floating selection toolbar (comment, delete, suggest, question, reaction), anchored comment rail, outline and files panels (with local-folder import), version history (open / restore), share drawer, exports (Markdown, JSON, HTML, PDF), light/dark documents, and a bundled interactive sample (`opendocs demo`)
+- **`@openplan/chrome`** — shared app chrome (top bar, modals and drawers with enter/exit transitions, sliding side panels, dropdowns) now used by both openplan and opendocs
+- **opendocs landing page** with a working review demo built on the real review engine, and a product switcher between openplan and opendocs on both marketing sites; the page is annotatable like openplan's
+- The **opendocs skill is bundled in the Claude Code plugin** (`/plugin install openplan@openplan` now gives both products), and `install.sh opendocs` installs the skill automatically when Claude Code is detected
+- `DEPLOY.md`: step-by-step deployment of the site, web app, backend and database on free tiers (Cloudflare Pages + Render + Neon)
+- Floating **reaction picker** in comment cards, and an **All / Open / Resolved** filter in the comments panel (also in openplan)
+
+### Changed
+
+- openplan's top bar, share dialog (now a drawer), side panels and comments header now use the shared chrome, so openplan and opendocs look and behave alike
+- One icon library (Hugeicons) everywhere: inline SVG and glyph icons were removed from both apps, both landing pages and the shared packages
+- Release and CI now build and publish `opendocs` and `opendocs-proxy` tarballs, and CI runs the PostgreSQL store contract against a Postgres service and builds the proxy Docker image
+- `scripts/install.sh` accepts `opendocs` and `opendocs-proxy`
+- `render.yaml` no longer creates a Render database (its free Postgres expires after ~30 days); `DATABASE_URL` is supplied by you (Neon's free tier is the documented path)
+
+### Fixed
+
+- Selecting a whole paragraph (triple-click) in an opendocs document now works: ranges whose end boundary is an element are intersected with the text nodes instead of being rejected
+
+### Security
+
+- opendocs validates document ids before they reach the filesystem store (no `..`, separators or escaped slashes)
+- The proxy stores only SHA-256 hashes of link tokens, never returns a comment owner's hash, keeps tokens out of URLs (fragment + `Authorization`), serves documents only into a sandboxed iframe, and sends no CORS headers unless an exact-origin allow-list is configured
+
 ## [0.5.0] - 2026-11-04
 
 ### Added

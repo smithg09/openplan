@@ -1,5 +1,6 @@
 import React from 'react';
-import { GithubIcon, SunIcon, MoonIcon } from '../icons';
+import { SiteSwitcher } from '@openplan/chrome';
+import { Icon, GithubIcon, SunIcon, MoonIcon } from '../icons';
 
 interface NavProps {
   theme: 'dark' | 'light';
@@ -10,11 +11,7 @@ export default function Nav({ theme, onToggle }: NavProps) {
   return (
     <nav>
       <div className="ni">
-        <a href="#" className="wm">
-          <span className="wm-p">$</span>
-          <span className="wm-s">/</span>
-          <span className="wm-n">openplan</span>
-        </a>
+        <SiteSwitcher current="openplan" />
         <div className="ns" />
         <div className="nl">
           <button className="thm" onClick={onToggle} title="Toggle theme">
@@ -24,7 +21,7 @@ export default function Nav({ theme, onToggle }: NavProps) {
             <GithubIcon /> GitHub
           </a>
           <a href="https://openplan.smithgajjar.dev/app/" target="_blank" rel="noreferrer" className="ncta">
-            Try Demo →
+            Try Demo <Icon name="arrow_right" size={13} />
           </a>
         </div>
       </div>

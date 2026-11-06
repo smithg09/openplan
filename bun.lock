@@ -11,10 +11,49 @@
     },
     "apps/landing-page": {
       "name": "@openplan/landing-page",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/plan-viewer": "workspace:*",
+        "@openplan/shared": "workspace:*",
+        "@openplan/toolbar": "workspace:*",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^18.3.17",
+        "@types/react-dom": "^18.3.5",
+        "@vitejs/plugin-react": "^4.3.4",
+        "typescript": "^5.7.3",
+        "vite": "^6.0.7",
+      },
+    },
+    "apps/opendocs-landing": {
+      "name": "@openplan/opendocs-landing",
+      "version": "0.6.0",
+      "dependencies": {
+        "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
+        "@openplan/shared": "workspace:*",
+        "@openplan/toolbar": "workspace:*",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^18.3.17",
+        "@types/react-dom": "^18.3.5",
+        "@vitejs/plugin-react": "^4.3.4",
+        "typescript": "^5.7.3",
+        "vite": "^6.0.7",
+      },
+    },
+    "apps/opendocs-ui": {
+      "name": "@openplan/opendocs-ui",
+      "version": "0.6.0",
+      "dependencies": {
+        "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/shared": "workspace:*",
         "@openplan/toolbar": "workspace:*",
         "react": "^18.3.1",
@@ -30,9 +69,10 @@
     },
     "apps/ui": {
       "name": "@openplan/ui",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@openplan/annotations": "workspace:*",
+        "@openplan/chrome": "workspace:*",
         "@openplan/diff-viewer": "workspace:*",
         "@openplan/plan-viewer": "workspace:*",
         "@openplan/shared": "workspace:*",
@@ -70,6 +110,21 @@
       "peerDependencies": {
         "react": "^18.0.0",
         "react-dom": "^18.0.0",
+      },
+    },
+    "packages/chrome": {
+      "name": "@openplan/chrome",
+      "version": "0.6.0",
+      "dependencies": {
+        "@openplan/annotations": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/react": "^18.3.17",
+        "react": "^18.3.1",
+        "typescript": "^5.7.3",
+      },
+      "peerDependencies": {
+        "react": "^18.0.0",
       },
     },
     "packages/diff-viewer": {
@@ -124,9 +179,14 @@
     },
     "packages/shared": {
       "name": "@openplan/shared",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "devDependencies": {
+        "@types/react": "^18.3.17",
+        "react": "^18.3.1",
         "typescript": "^5.7.3",
+      },
+      "peerDependencies": {
+        "react": "^18.0.0",
       },
     },
     "packages/toolbar": {
@@ -135,6 +195,7 @@
       "dependencies": {
         "@hugeicons/core-free-icons": "^4.4.0",
         "@hugeicons/react": "^1.1.10",
+        "@openplan/annotations": "workspace:*",
       },
       "devDependencies": {
         "@types/react": "^18.3.17",
@@ -254,11 +315,17 @@
 
     "@openplan/annotations": ["@openplan/annotations@workspace:packages/annotations"],
 
+    "@openplan/chrome": ["@openplan/chrome@workspace:packages/chrome"],
+
     "@openplan/diff-viewer": ["@openplan/diff-viewer@workspace:packages/diff-viewer"],
 
     "@openplan/highlighter": ["@openplan/highlighter@workspace:packages/highlighter"],
 
     "@openplan/landing-page": ["@openplan/landing-page@workspace:apps/landing-page"],
+
+    "@openplan/opendocs-landing": ["@openplan/opendocs-landing@workspace:apps/opendocs-landing"],
+
+    "@openplan/opendocs-ui": ["@openplan/opendocs-ui@workspace:apps/opendocs-ui"],
 
     "@openplan/plan-viewer": ["@openplan/plan-viewer@workspace:packages/plan-viewer"],
 

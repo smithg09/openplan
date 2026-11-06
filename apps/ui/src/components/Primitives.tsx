@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@openplan/annotations';
 
 // ── Button ─────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ export const Bracket: React.FC<BracketProps> = ({ children, color, onClick, hasC
   >
     <span className="op-bracket-l">[</span>
     <span className="op-bracket-content">{children}</span>
-    {hasChevron && <span className="op-bracket-chev">▾</span>}
+    {hasChevron && <span className="op-bracket-chev"><Icon name="expand_more" size={9} /></span>}
     <span className="op-bracket-r">]</span>
   </span>
 );
@@ -100,7 +101,7 @@ export const Toast: React.FC<{ children: React.ReactNode; onClose?: () => void }
   <div className="op-toast">
     <span className="op-toast-bullet">●</span>
     <span>{children}</span>
-    {onClose && <button className="op-toast-close" onClick={onClose}>×</button>}
+    {onClose && <button className="op-toast-close" onClick={onClose} aria-label="Dismiss"><Icon name="close" size={12} /></button>}
   </div>
 );
 
@@ -126,11 +127,7 @@ export const Wordmark: React.FC = () => (
 
 export const Chevron: React.FC<{ dir?: 'down' | 'up' | 'left' | 'right'; size?: number }> = ({ dir = 'down', size = 10 }) => {
   const rot = { down: 0, up: 180, right: -90, left: 90 }[dir];
-  return (
-    <svg width={size} height={size} viewBox="0 0 10 10" style={{ transform: `rotate(${rot}deg)`, transition: 'transform 120ms', display: 'inline-block', flexShrink: 0 }}>
-      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <span style={{ display: 'inline-flex', transform: `rotate(${rot}deg)`, transition: 'transform 160ms cubic-bezier(.16,1,.3,1)', flexShrink: 0 }}><Icon name="expand_more" size={size + 2} /></span>;
 };
 
 // ── Saved pill ─────────────────────────────────────────────────────────────

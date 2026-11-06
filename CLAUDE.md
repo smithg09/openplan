@@ -9,12 +9,15 @@ openplan (root)
 ├── apps/
 │   ├── cli/              → Go CLI (cobra-based, entry: main.go)
 │   ├── ui/               → React + Vite main app (Tailwind CSS v4, Zustand)
+│   ├── opendocs-ui/      → React + Vite host UI for the `opendocs` binary (plain CSS + tokens, no Tailwind)
 │   ├── landing-page/     → React + Vite marketing site (vanilla CSS)
+│   ├── opendocs-landing/ → React + Vite marketing site for opendocs (vanilla CSS; deploys to Cloudflare Pages)
 │   ├── plugin/           → Claude Code plugin (hooks + slash commands)
 │   ├── plugin-copilot/   → GitHub Copilot CLI plugin (hooks.json + plugin.json + commands/)
 │   ├── plugin-codex/     → Codex CLI hook config (hooks.json only — skills ship via `openplan install codex`, not this folder)
 │   └── plugin-agy/       → Antigravity CLI (agy) plugin (hooks.json + minimal plugin.json)
 ├── packages/             → Shared React component packages
+│   ├── chrome/           → app chrome shared by openplan + opendocs: TopBar, Modal/Drawer/SlidePanel (animated), Button/Dropdown, SiteSwitcher, chrome.css (op-* primitives)
 │   ├── shared/
 │   ├── plan-viewer/
 │   ├── toolbar/
@@ -44,8 +47,14 @@ openplan (root)
 bun install                  # Install all workspace dependencies
 bun run build:ui             # Build main UI → apps/cli/internal/server/ui/dist/
 bun run build:landing        # Build landing page → apps/landing-page/dist/
+bun run build:opendocs-landing # Build opendocs marketing site → apps/opendocs-landing/dist/ (public/open/ = deep-link page)
 bun run build:cli            # Build Go binary → bin/openplan
 bun run build                # Build UI + CLI (UI first, then CLI)
+bun run build:opendocs-ui    # Build opendocs host UI → apps/cli/internal/opendocs/server/ui/dist/
+bun run build:opendocs       # Build Go binary → bin/opendocs
+bun run build:opendocs-web   # Hosted web build of opendocs-ui → apps/opendocs-landing/dist/app (run after build:opendocs-landing, which empties dist/)
+bun run build:docs           # opendocs UI + binary (UI first)
+bun run dev:opendocs-ui      # Vite dev server for opendocs UI (proxies /api → :7433; run `opendocs serve --port 7433`)
 bun run dev:ui               # Vite dev server for main UI (port 5173, proxies /api → :7432)
 bun run dev:landing          # Vite dev server for landing page (port 5174)
 bun run typecheck            # TypeScript type checking (via Turbo)
@@ -194,6 +203,163 @@ support was empirically found unreliable — see above). Instead written directl
 `openplan install codex` / `openplan install agy` as `SKILL.md` files — see "Automated install"
 above for the exact paths and the source of truth in `internal/hookinstall/skills/`.
 
+## opendocs (sibling binary)
+
+`opendocs` reviews rich **HTML documents** (agents publish self-contained HTML, people comment on
+the exact words, every version is kept), local-first. It is a **second `main` in the same Go module**
+(`apps/cli/cmd/opendocs/`) — not a separate module, because Go's `internal/` rule forbids a
+separate module from importing `apps/cli/internal/*`. It ships as its own release artifact
+(`opendocs_<os>_<arch>.tar.gz`); `scripts/install.sh` takes `opendocs` as its first arg.
+
+| Command | Description |
+|---------|-------------|
+| `opendocs open <file.html>` | Snapshot the file if changed, start the local server, open the browser |
+| `opendocs review <file.html>` | Like `open`, but blocks until the reviewer clicks **Submit review**, then prints open threads as JSON on stdout (status goes to stderr) |
+| `opendocs serve` | Project dashboard server |
+| `opendocs create <file.html>` / `versions <doc>` / `comments <doc>` / `restore <doc> <version-id>` | Store-backed CLI |
+| `opendocs search [--all-projects] [--json] <query>` | Local full-text search over each doc's title + latest version (`internal/opendocs/search`): every word must appear (prefix match on word starts), `"phrases"`, `-exclude`. Flags go **before** the query (`SetInterspersed(false)`, so `-word` isn't read as a flag). Also `GET /api/search?q=` on the local server |
+| `opendocs guidelines` | Prints the HTML authoring contract (`cmd/opendocs/guidelines.md`, embedded); the publish skill tells agents to read it first |
+| `opendocs publish <file> [--proxy URL]` | Upload to an `opendocs-proxy`: first run creates the doc and prints commenter/viewer/**editor** links, later runs add a version to the same doc |
+| `opendocs feedback <file>` | One-shot JSON of open threads for a published file (no blocking; the proxy has no "Submit review" signal) |
+| `opendocs config proxy [url]` | Show/set the default proxy. Resolution: `--proxy` → `$OPENDOCS_PROXY` → saved default → hosted default (`remote.HostedURL`, empty until deployed) |
+| `opendocs install <claude\|codex\|agy>` | Write the single `opendocs` skill (structure follows the slashdocs skill) where that agent discovers it |
+
+Package layout (`apps/cli/internal/opendocs/`):
+
+- `store/` — content-addressed immutable versions under `~/.opendocs/docs/<project>/<doc>/`
+  (`versions/<sha256>.html`, `versions.json` manifest with parent chain, doc-scoped `comments.json`).
+  Atomic temp+rename writes; `expectedHead` gives If-Match optimistic concurrency (`ErrConflict`).
+- `render/` — embeds `bridge.js` and injects it at the top of `<head>`. Hand-written vanilla JS on
+  purpose (no bundler in the Go build). Anchoring is a port of slashdocs' TextQuoteSelector idea
+  (MIT — `LICENSE.slashdocs` kept alongside).
+- `server/` — same-origin `net/http` (Go 1.22 method patterns); `GET .../versions/{id}/frame` returns
+  bridge-injected HTML; embeds `ui/dist` with `//go:embed all:ui/dist` and a **force-tracked
+  `.gitkeep`** so `go build`/`go test` work before the UI is built (assets stay gitignored).
+
+**Sandbox model (important):** the doc renders in `<iframe sandbox="allow-scripts">` with **no
+`allow-same-origin`** (opaque origin, can't reach the API/cookies). The bridge runs *inside* the
+iframe and talks to the host only via `postMessage`; the host filters by
+`event.source === iframe.contentWindow` (origin is `"null"`).
+
+Hardening around that (all in `internal/opendocs/server`, each with tests):
+
+- `/frame` refuses top-level navigation (`Sec-Fetch-Dest` other than `iframe` → 403) and sends
+  `X-Frame-Options: SAMEORIGIN`. Otherwise opening the frame URL directly would run the agent's HTML
+  same-origin with the API.
+- **All mutating `/api/` requests must be `Content-Type: application/json`** (else 415) and are capped
+  at 5 MB. Untrusted doc scripts or other sites could otherwise send a `text/plain` "simple" CORS
+  request (no preflight) that the handlers would decode as JSON. The UI client sends it on every
+  non-GET, including body-less ones.
+- An explicit `--port` that is taken is an error (no silent fallback to a random port).
+- `Store.Doc()` handles share a per-doc lock held in the `Store`; handles are created per request,
+  so a lock inside the handle would protect nothing. In-process only — a separate CLI process writing
+  the same dir is not coordinated.
+
+**`opendocs-proxy` (third binary, `apps/cli/cmd/opendocs-proxy/`)** is the self-hostable multi-tenant
+server — same module, own release tarball (`opendocs-proxy_<os>_<arch>.tar.gz`), serves the same embedded
+opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) is unchanged and acts as an editor.
+
+- **Capability links, no accounts.** `POST /api/docs` mints an opaque doc id + editor token (the only
+  unauthenticated write). Editors mint viewer/commenter/editor tokens via `POST .../shares`. Tokens are
+  256-bit, sent as `Authorization: Bearer`, **only their sha256 is stored** (`auth/`). The proxy has no
+  "list all docs" endpoint; an unknown doc and a bad token both return 401 so ids can't be probed.
+- **Role matrix** (`auth.Role.Can`, pinned in `auth_test.go`): viewer reads; commenter also comments,
+  replies, reacts, resolves; editor also publishes/restores versions, shares, deletes any comment.
+  Edit is author-only for everyone (even editors). Each comment records `Owner` (token hash), which is
+  stripped from API responses and replaced by a per-caller `mine` flag.
+- **Frame URLs are signed, never tokened.** The iframe can't send headers and the doc's script can read its
+  own URL, so `GET .../versions/{id}/frame-url` (viewer+) returns an HMAC-signed, 5-minute, doc+version-scoped
+  `?sig=`. `/frame` in proxy mode accepts only that. Share links carry the token in the URL **fragment**
+  (`/d/<id>#t=<token>`); the UI moves it to `sessionStorage` and strips it from the address bar.
+- **Storage:** `--store sqlite` (default), `postgres` (`--database-url` / `$DATABASE_URL`) or `fs`.
+  `internal/opendocs/sqlstore` is one dialect-aware implementation for SQLite (pure-Go `modernc.org/sqlite`,
+  pinned v1.44.0 because newer releases force `go 1.26`) and Postgres (`pgx` stdlib); all backends pass
+  `store/storetest` (Postgres gated on `OPENDOCS_TEST_PG_DSN`; CI runs it against a postgres:16 service).
+  **Drivers are imported only by the proxy** (check: `go list -deps ./cmd/opendocs . | grep -cE 'modernc|pgx'`
+  must be 0). For sqlite/postgres, **capability grants live in the DB too** (`sqlstore.Grants()`), so an
+  ephemeral-disk host keeps share links across deploys; `fs` uses `grants.json`. Signing key: `$OPENDOCS_SIGNING_KEY`
+  or `--data/signing.key`.
+- **Live updates** (`server/live.go`): `GET /api/docs/{doc}/events` (viewer+, SSE; both local and proxy mode)
+  streams `{"type":"comments"|"versions"|"presence","count"?}`. Events say only *that* something changed — clients
+  refetch through the normal authorised API, so the stream never carries content. Published by `guard()` only
+  after a mutation returns <300; coalesced per subscriber; 100 streams/doc cap; 25 s keepalive. The UI uses
+  `fetch` streaming (EventSource can't send `Authorization`), repaints comments, shows "N here" and a
+  "New version — view" button (it never switches versions under a reader). **In-process only**: one proxy
+  instance; several instances would need a shared bus (Postgres LISTEN/NOTIFY / Redis). Tests that open streams
+  must register `ts.Close` via `t.Cleanup` *before* the streams (else `httptest.Server.Close` hangs on them).
+- **No "Submit review".** `opendocs review` returns when the reviewer **closes the review tab** (no SSE viewer for 8 s after at
+  least one connected — `hub.onIdle` → `Server.Done()`); there is no submit endpoint. **Icons:** one library everywhere —
+  Hugeicons via `<Icon name>` in `@openplan/annotations` (toolbar re-exports it; no inline SVG/glyph icons in apps).
+  **Transitions:** `Modal`/`Drawer` play enter+exit animations (use `useDismiss`/`DismissButton` inside them), `SlidePanel`
+  animates side panels, `Dropdown` menus animate; all respect `prefers-reduced-motion`.
+- **Sample document:** `internal/opendocs/sample/retry-storm.html` is a self-contained interactive explainer (chart + slider,
+  checklist, tabs, light/dark) used by `opendocs demo`, `GET /api/sample`, the app's first-run button and the landing demo;
+  `TestSampleFollowsTheGuidelines` holds it to the guidelines. The landing demo runs the **real** `render/bridge.js` +
+  `render/bridge.css` (imported with `?raw`) in a sandboxed iframe.
+- **Hosted web app (`opendocs.smithgajjar.dev/app`).** Same `opendocs-ui`, built with `VITE_WEB=true` (`base /app/`, output into the
+  landing's `dist/app`; `.github/workflows/opendocs-site.yml` builds landing then web, `public/_redirects` gives `/app/d/*` SPA
+  routing). `api.ts` is a switchable client: `bootstrap()` picks same-origin HTTP (Go server / proxy UI), HTTP to a proxy for a
+  `/app/d/<id>?proxy=…#t=…` link (`DEFAULT_PROXY`, `VITE_DEFAULT_PROXY`), or `webstore.ts` — documents, versions and comments in
+  **IndexedDB**, the sample seeded on first visit, publish/links via fetch to the proxy. There is no server, so a published doc's
+  **editor token lives in this browser's storage**. The page builds the sandbox HTML itself (`frame.ts`, same bridge via `?raw`).
+  The proxy must opt in: `--cors-origin`/`$OPENDOCS_CORS_ORIGINS` is an exact-origin allow-list (no wildcard, no credentials);
+  render.yaml sets it. `remote.HostedURL` (Go) and `DEFAULT_PROXY` (web) default to `https://opendocs-proxy.onrender.com` — the URL
+  render.yaml implies; change both if you deploy elsewhere.
+- **Local-mode sharing from the UI** (`server/publish.go`, local server only): `GET/POST /api/settings` (proxy URL, validated
+  https-or-localhost), `GET /api/docs/{doc}/remote`, `POST .../publish` (head version → proxy; first time creates the
+  remote doc, later adds a version), `POST .../remote/links {role}` (mints a fresh revocable link). State is keyed
+  `doc:<project>/<slug>` in `~/.opendocs/state.json`; **the editor token never goes to the browser**.
+  UI (`apps/opendocs-ui/src/`): reuses openplan's chrome — `@openplan/chrome` (`chrome.css` op-* primitives, `TopBar`, `Modal`/`Drawer`/`SlidePanel`,
+  `RailHeader` lives in `@openplan/annotations`); openplan's own TopBar, share drawer, side panels and comments header now use the
+  same components, so the two apps differ only in which actions/panels they offer, the Hugeicons registry in `@openplan/annotations`, `SelectionToolbar`/
+  `CommentPopover`/`SuggestionPopover` from `@openplan/toolbar`. `components/`: `TopBar`, `LeftPanel` (outline from the
+  bridge + documents + **local folders via the File System Access API**, imported as versions), `AnchoredRail` (cards
+  sit at their highlight's document Y, from the bridge's `opendocs:layout`), `VersionHistoryModal`, `ShareDrawer`
+  (SlashDocs-style), `SettingsModal`, `ShortcutsModal`. Documents follow light/dark: the bridge sets `data-theme`, a
+  class and `color-scheme` on the doc's `<html>` (guidelines tell agents to style both). Sandbox is
+  `allow-scripts allow-modals` (modals only so the bridge can `window.print()`). Comment `type`
+  (comment/question/suggestion/deletion/emoji) and `suggestion` are stored on the comment. `/api/docs/{doc}/…/restore`
+  and `…/raw` (octet-stream attachment) exist; doc ids are validated (`validDocID`) because the fs store joins them
+  into paths.
+- **Abuse limits** (`server/limits.go`, `server.WithLimits`): per-IP token buckets (new docs/hour, other
+  writes/min), per-doc version/comment/comment-length quotas (413), `--trust-proxy` reads the *last*
+  X-Forwarded-For hop. `GET /healthz`. `PORT` and `OPENDOCS_DATA` env are honoured.
+- **Hosted deploy:** see `DEPLOY.md` (Cloudflare Pages + Render free web service + Neon free Postgres). `Dockerfile.opendocs-proxy` +
+  `render.yaml` (web service only; `DATABASE_URL` is supplied, not a Render DB). Not deployed — needs the owner's accounts. `apps/opendocs-landing/` (React+Vite, vanilla CSS, **same tokens as openplan's landing**) is the marketing site for Cloudflare Pages
+  (`.github/workflows/opendocs-site.yml`, needs `CLOUDFLARE_*` secrets and repo var `OPENDOCS_SITE_ENABLED=true`)
+  including `/open/#proxy=<https url>&doc=<id>&t=<token>`, a deep-link interstitial that shows the
+  destination host and never auto-redirects (fragment keeps the token off servers; https or localhost only).
+  Render's free Postgres expires after ~30 days — use Neon (or another) for anything lasting.
+- **CLI ↔ proxy:** `internal/opendocs/remote` is the client plus `~/.opendocs/state.json` (0600 — it holds
+  editor tokens, keyed by absolute file path). Proxy URLs must be https (http only for localhost).
+- **The opendocs skill also ships in the Claude plugin** (`apps/plugin/skills/opendocs/SKILL.md`, byte-identical to the embedded one —
+  `TestPluginSkillMatchesEmbedded` enforces it; copy the embedded file over it when you edit). `install.sh opendocs` runs
+  `opendocs install claude` when `~/.claude` exists and the openplan plugin isn't already installed.
+- **Skills** are embedded from `internal/hookinstall/skills/opendocs/` (`WriteOpendocsSkills`) and installed by
+  `opendocs install`: claude → `~/.claude/skills`, codex → `~/.codex/skills`, agy → `~/.gemini/skills` (global only).
+  **Copilot is deliberately unsupported** (no verified skills directory on this machine); `TestSkillsReferenceRealCommands`
+  fails if a skill mentions an `opendocs` subcommand that doesn't exist.
+- **Search is local-only by design:** the proxy has no accounts, so there is no "my documents" set to search
+  (a capability link reaches exactly one doc); `TestProxyHasNoSearch` pins that. It scans head versions in
+  memory (fine for a personal doc set); no index, so no Postgres tsvector/SQLite FTS yet.
+- Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search, a
+  deployed hosted default (set `remote.HostedURL`).
+
+**Rendering finding (verified):** Claude's preview pane blocks the *network request* of a sandboxed
+(opaque-origin) iframe with `net::ERR_BLOCKED_BY_CLIENT`; same URL in a non-sandboxed or
+`allow-same-origin` iframe loads, and `srcdoc` works. So opendocs-ui `fetch()`es the frame HTML and sets it
+as the iframe's `srcdoc` (sandbox `allow-scripts` only). `/frame` therefore accepts `Sec-Fetch-Dest`
+`empty`/`iframe`/absent and refuses everything else (e.g. `document`). Still no
+`Content-Security-Policy: sandbox` header (untested in stock Chromium).
+
+**Gotchas:** the API/store anchor uses `start`/`end`; the shared `CommentAnchor` uses
+`startOffset`/`endOffset` — conversion lives only in `apps/opendocs-ui/src/adapt.ts`. opendocs-ui
+reuses `AnnoCard` via that adapter but **not** `CommentRail` (it is coupled to same-document
+`[data-bind-id]` marks and can't see inside the iframe). opendocs-ui builds into
+`apps/cli/internal/opendocs/server/ui/dist` with `emptyOutDir: false` — never point it near
+openplan's `internal/server/ui/dist` (that would wipe openplan's UI). UI must be built before the Go
+binary, same as openplan.
+
 ## Important Paths
 
 ### Go CLI (`apps/cli/`)
@@ -225,6 +391,13 @@ above for the exact paths and the source of truth in `internal/hookinstall/skill
 | `src/components/` | Hero, Nav, FeaturesSection, DemoSection, PageAnnotator, etc. |
 | `src/tokens.css` | Design tokens (separate from main UI) |
 | `src/icons.tsx` | SVG icon components |
+
+The opendocs landing (`apps/opendocs-landing`) reuses **openplan's landing CSS and layout** (hero with agent chips +
+install box, trust strip, same buttons/nav) and adds: `DemoSection` (the real bridge + sample document in an iframe, with the real toolbar/`AnnoCard` components), `FlowSection` (numbered
+steps beside a terminal, no cards), `Features` (alternating rows separated by hairlines), `Faq`. Demo copy uses invented
+names and an invented incident; nothing is real usage data. No emoji in UI chrome (reactions are content).
+
+Both marketing navs render `SiteSwitcher` from `@openplan/shared` (`packages/shared/src/SiteSwitcher.tsx`): a hover/focus/click dropdown on the product name that links openplan ⇄ opendocs. Add a product to `SITES` there and both navs pick it up.
 
 ### Plugin (`apps/plugin/`)
 

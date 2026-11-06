@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
 import { AnnoCard } from './AnnoCard';
-import { Icon } from './icons';
+import { RailHeader, type RailFilter } from './RailHeader';
 
 interface CommentRailProps {
   annotations: Annotation[];
@@ -45,6 +45,7 @@ export const CommentRail: React.FC<CommentRailProps> = ({
   const animateRef = React.useRef(false);
   const hoverTimerRef = React.useRef<number | null>(null);
   const [hoveredId, setHoveredId] = React.useState<string | null>(null);
+  const [filter, setFilter] = React.useState<RailFilter>('all');
 
   // Small hover-intent delay: expanding a card reflows its neighbours, which can
   // slide another card under the cursor and bounce the hover between them.
@@ -175,34 +176,29 @@ export const CommentRail: React.FC<CommentRailProps> = ({
   }, [annotations, focusId, hoveredId, reflow]);
 
   const total = annotations.length;
+  const visible = annotations.filter(a => (filter === 'all' ? true : filter === 'open' ? !a.resolved : a.resolved));
 
   return (
     <div className="op-annopanel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)' }}>Comments</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)', borderRadius: 6, padding: '0 7px', minWidth: 18, textAlign: 'center' }}>{total}</span>
-        <div style={{ flex: 1 }} />
-        {onCopyMD && (
-          <button onClick={onCopyMD} title="Copy as Markdown" style={{ fontSize: 12, color: 'var(--text-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>Copy MD</button>
-        )}
-        <button onClick={onClose} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-faint)', borderRadius: 6, display: 'inline-flex' }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; }} onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-faint)'; }}>
-          <Icon name="close" size={16} />
-        </button>
-      </div>
+      <RailHeader
+        count={annotations.filter(x => !x.resolved).length}
+        filter={filter}
+        counts={{ all: annotations.length, open: annotations.filter(x => !x.resolved).length, resolved: annotations.filter(x => x.resolved).length }}
+        onFilter={setFilter}
+        onCopyMD={onCopyMD}
+        onClose={onClose}
+      />
 
       {/* Scrollable anchored viewport */}
       <div ref={viewportRef} className="op-rail-viewport" style={{ position: 'relative', flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-        {total === 0 ? (
+        {visible.length === 0 ? (
           <div style={{ padding: '36px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>No comments yet</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>{total === 0 ? 'No comments yet' : `No ${filter} comments`}</div>
             <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>Select text to add one.</div>
           </div>
         ) : (
           <div ref={innerRef} style={{ position: 'relative', width: '100%' }}>
-            {annotations.map(a => {
+            {visible.map(a => {
               const expanded = a.id === focusId || a.id === hoveredId;
               return (
                 <div

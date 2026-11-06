@@ -1,3 +1,4 @@
+import { Icon } from '@openplan/annotations';
 import React from 'react';
 
 const INSTALL_CMD = 'curl -fsSL https://openplan.smithgajjar.dev/install.sh | sh';
@@ -103,7 +104,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({ currentVersion }) =>
           style={{ color: 'var(--text-muted)', fontSize: 16, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
           title="Dismiss"
         >
-          ×
+          <Icon name="close" size={14} />
         </button>
       </div>
 

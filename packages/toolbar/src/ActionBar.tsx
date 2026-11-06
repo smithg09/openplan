@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from './icons';
 
 // ── Inlined primitives from Primitives.tsx to keep it self-contained ───────────
 
@@ -47,11 +48,7 @@ const Button: React.FC<ButtonProps> = ({
 
 const Chevron: React.FC<{ dir?: 'down' | 'up' | 'left' | 'right'; size?: number }> = ({ dir = 'down', size = 10 }) => {
   const rot = { down: 0, up: 180, right: -90, left: 90 }[dir];
-  return (
-    <svg width={size} height={size} viewBox="0 0 10 10" style={{ transform: `rotate(${rot}deg)`, transition: 'transform 120ms', display: 'inline-block', flexShrink: 0 }}>
-      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <span style={{ display: 'inline-flex', transform: `rotate(${rot}deg)`, transition: 'transform 160ms cubic-bezier(.16,1,.3,1)', flexShrink: 0 }}><Icon name="expand_more" size={size + 2} /></span>;
 };
 
 // ── Shared ActionBar Component ───────────────────────────────────────────────

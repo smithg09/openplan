@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
 declare const __APP_VERSION__: string;
-import { GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
+import { Icon, GithubIcon, CopyIcon, CheckSmIcon } from '../icons';
 
 const HARNESSES = [
   {
@@ -133,7 +133,7 @@ export default function Hero() {
 
       <div className="hctas">
         <a href="https://openplan.smithgajjar.dev/app/" target="_blank" rel="noreferrer" className="btnp">
-          Try live demo →
+          Try live demo <Icon name="arrow_right" size={14} />
         </a>
         <a href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" className="btno">
           <GithubIcon /> View on GitHub

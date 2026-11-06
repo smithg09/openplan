@@ -1,0 +1,27 @@
+# opendocs-proxy: self-hostable multi-tenant opendocs server.
+#   docker build -f Dockerfile.opendocs-proxy -t opendocs-proxy .
+#   docker run -p 7435:7435 -e PORT=7435 -v odp:/data -e OPENDOCS_DATA=/data opendocs-proxy
+FROM oven/bun:1 AS ui
+WORKDIR /src
+COPY package.json bun.lock turbo.json ./
+COPY apps ./apps
+COPY packages ./packages
+RUN bun install --frozen-lockfile && bun run build:opendocs-ui
+
+FROM golang:1.25-alpine AS build
+WORKDIR /src/apps/cli
+COPY apps/cli/go.mod apps/cli/go.sum ./
+RUN go mod download
+COPY apps/cli ./
+COPY --from=ui /src/apps/cli/internal/opendocs/server/ui/dist ./internal/opendocs/server/ui/dist
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o /out/opendocs-proxy ./cmd/opendocs-proxy
+
+FROM alpine:3.20
+RUN adduser -D -u 10001 app && mkdir /data && chown app /data
+USER app
+ENV OPENDOCS_DATA=/data PORT=7435
+EXPOSE 7435
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:${PORT}/healthz || exit 1
+COPY --from=build /out/opendocs-proxy /usr/local/bin/opendocs-proxy
+ENTRYPOINT ["opendocs-proxy"]

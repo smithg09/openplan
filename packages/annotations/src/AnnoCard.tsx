@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Annotation } from '@openplan/shared';
+import { ReactionPicker } from './ReactionPicker';
 import { AnnoIcon, Icon, ANNOTATION_TYPES } from './icons';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -13,14 +14,15 @@ function formatAdded(iso: string): string {
   return `Added ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} at ${h}:${m} ${ap}`;
 }
 
-const QUICK_REACTIONS = ['👍', '🎉', '❤️', '🚀', '👀'];
 
 interface AnnoCardProps {
   anno: Annotation;
   isFocus: boolean;
   onClick: () => void;
-  onEdit: (id: string, body: string) => void;
-  onRemove: () => void;
+  /** Omit to hide the edit control (e.g. a comment you did not write). */
+  onEdit?: (id: string, body: string) => void;
+  /** Omit to hide the remove control. */
+  onRemove?: () => void;
   onResolve?: (id: string) => void;
   onReply?: (id: string, body: string) => void;
   onReact?: (id: string, emoji: string) => void;
@@ -45,7 +47,7 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
   React.useEffect(() => { if (editing) { setEditValue(anno.body ?? ''); textareaRef.current?.focus(); } }, [editing, anno.body]);
   React.useEffect(() => { if (replying) replyRef.current?.focus(); }, [replying]);
 
-  const handleSave = () => { onEdit(anno.id, editValue); setEditing(false); };
+  const handleSave = () => { onEdit?.(anno.id, editValue); setEditing(false); };
   const handleReply = () => {
     if (replyValue.trim() && onReply) onReply(anno.id, replyValue.trim());
     setReplyValue(''); setReplying(false);
@@ -174,17 +176,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
       )}
 
       {/* Reactions */}
-      {(reactions.length > 0 || (onReact && pickReaction)) && (
+      {reactions.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
           {reactions.map(r => (
             <button key={r.emoji} onClick={e => { e.stopPropagation(); onReact?.(anno.id, r.emoji); }}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: onReact ? 'pointer' : 'default', fontSize: 12.5, padding: '2px 8px', borderRadius: 6, border: `1px solid ${r.reactedByMe ? 'var(--accent)' : 'var(--border)'}`, background: r.reactedByMe ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'var(--bg-inset)', color: 'var(--text-secondary)' }}>
               <span>{r.emoji}</span><span style={{ fontSize: 11 }}>{r.count}</span>
             </button>
-          ))}
-          {onReact && pickReaction && QUICK_REACTIONS.filter(e => !reactions.some(r => r.emoji === e)).map(e => (
-            <button key={e} onClick={ev => { ev.stopPropagation(); onReact(anno.id, e); setPickReaction(false); }}
-              style={{ fontSize: 13, padding: '2px 7px', borderRadius: 6, border: '1px dashed var(--border)', background: 'none', cursor: 'pointer' }}>{e}</button>
           ))}
         </div>
       )}
@@ -220,10 +218,13 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
       {/* Footer */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
         {onReact && (
-          <button title="React" style={ftBtn} onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
-            onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-            <Icon name="add_reaction" size={18} />
-          </button>
+          <div style={{ position: 'relative', display: 'inline-flex' }}>
+            <button title="React" style={ftBtn} onClick={e => { e.stopPropagation(); setPickReaction(v => !v); }}
+              onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
+              <Icon name="add_reaction" size={18} />
+            </button>
+            {pickReaction && <ReactionPicker onPick={emoji => onReact(anno.id, emoji)} onClose={() => setPickReaction(false)} />}
+          </div>
         )}
         <div style={{ flex: 1 }} />
         {onReply && (
@@ -238,16 +239,18 @@ export const AnnoCard: React.FC<AnnoCardProps> = ({
             <Icon name="link" size={18} />
           </button>
         )}
-        {anno.type !== 'emoji' && anno.type !== 'deletion' && (
+        {onEdit && anno.type !== 'emoji' && anno.type !== 'deletion' && (
           <button title="Edit" style={ftBtn} onClick={e => { e.stopPropagation(); setEditing(true); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--text-secondary)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
             <Icon name="edit" size={17} />
           </button>
         )}
-        <button title="Remove" style={ftBtn} onClick={e => { e.stopPropagation(); onRemove(); }}
-          onMouseEnter={e => hoverable(e.currentTarget, 'var(--danger)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
-          <Icon name="delete" size={17} />
-        </button>
+        {onRemove && (
+          <button title="Remove" style={ftBtn} onClick={e => { e.stopPropagation(); onRemove(); }}
+            onMouseEnter={e => hoverable(e.currentTarget, 'var(--danger)')} onMouseLeave={e => unhover(e.currentTarget, 'var(--text-faint)')}>
+            <Icon name="delete" size={17} />
+          </button>
+        )}
         {onResolve && (
           <button title={resolved ? 'Reopen' : 'Resolve'} style={{ ...ftBtn, color: resolved ? 'var(--teal)' : 'var(--text-faint)' }} onClick={e => { e.stopPropagation(); onResolve(anno.id); }}
             onMouseEnter={e => hoverable(e.currentTarget, 'var(--teal)')} onMouseLeave={e => unhover(e.currentTarget, resolved ? 'var(--teal)' : 'var(--text-faint)')}>

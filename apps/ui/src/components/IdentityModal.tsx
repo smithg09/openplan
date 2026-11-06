@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '@openplan/annotations';
 import { Button } from './Primitives';
 
 interface IdentityModalProps {
@@ -25,7 +26,7 @@ export const IdentityModal: React.FC<IdentityModalProps> = ({ soft, initialName,
       <div className="op-modal" style={{ width: 380 }} onClick={e => e.stopPropagation()}>
         <div className="op-modal-head">
           <span className="op-modal-title">// who are you?</span>
-          {soft && <Button kind="ghost" size="sm" onClick={onDismiss}>×</Button>}
+          {soft && <Button kind="ghost" size="sm" onClick={onDismiss} icon={<Icon name="close" size={14} />} title="Close" />}
         </div>
         <div className="op-modal-body">
           <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12, fontFamily: 'var(--font-mono)' }}>

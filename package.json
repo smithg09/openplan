@@ -1,6 +1,6 @@
 {
   "name": "openplan",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Interactive plan review for Claude Code — annotate, version, and manage plans in a browser UI.",
   "author": "Smith Gajjar <smith.gajjar@gmail.com>",
@@ -26,14 +26,22 @@
   "scripts": {
     "dev:ui": "bun run --cwd apps/ui dev",
     "dev:landing": "bun run --cwd apps/landing-page dev",
+    "dev:opendocs-ui": "bun run --cwd apps/opendocs-ui dev",
     "build:ui": "bun run --cwd apps/ui build",
+    "build:opendocs-landing": "bun run --cwd apps/opendocs-landing build",
+    "dev:opendocs-landing": "bun run --cwd apps/opendocs-landing dev",
     "build:landing": "bun run --cwd apps/landing-page build",
+    "build:opendocs-ui": "rm -rf apps/cli/internal/opendocs/server/ui/dist/assets && bun run --cwd apps/opendocs-ui build",
     "build:cli": "cd apps/cli && go build -o ../../bin/openplan .",
+    "build:opendocs": "cd apps/cli && go build -o ../../bin/opendocs ./cmd/opendocs",
     "build": "bun run build:ui && bun run build:cli",
+    "build:opendocs-proxy": "cd apps/cli && go build -o ../../bin/opendocs-proxy ./cmd/opendocs-proxy",
+    "build:docs": "bun run build:opendocs-ui && bun run build:opendocs && bun run build:opendocs-proxy",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test:cli": "cd apps/cli && go test ./...",
-    "test:coverage:cli": "cd apps/cli && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep total"
+    "test:coverage:cli": "cd apps/cli && go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | grep total",
+    "build:opendocs-web": "VITE_WEB=true bun run --cwd apps/opendocs-ui build"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

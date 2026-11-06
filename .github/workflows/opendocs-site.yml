@@ -1,0 +1,30 @@
+name: Deploy opendocs site (Cloudflare Pages)
+
+# Needs repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and a Pages
+# project named "opendocs". Point opendocs.smithgajjar.dev at it in Cloudflare.
+on:
+  push:
+    branches: [main]
+    paths: ["apps/opendocs-landing/**", "apps/opendocs-ui/**", "packages/**", "apps/cli/internal/opendocs/render/**", "apps/cli/internal/opendocs/sample/**", ".github/workflows/opendocs-site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.OPENDOCS_SITE_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build:opendocs-landing
+      # The hosted web app lives at /app/ inside the same site (built after the landing, which empties dist/).
+      - run: bun run build:opendocs-web
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/opendocs-landing/dist --project-name=opendocs
