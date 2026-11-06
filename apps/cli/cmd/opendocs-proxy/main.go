@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -39,6 +40,8 @@ var (
 	dataDir     string
 	storeKind   string
 	databaseURL string
+	jwksURL     string
+	authIssuer  string
 	limits      = server.DefaultLimits()
 	corsOrigins []string
 )
@@ -58,9 +61,20 @@ func init() {
 	rootCmd.Flags().IntVar(&limits.WritePerMin, "writes-per-min", limits.WritePerMin, "max other writes per client IP per minute (0 = unlimited)")
 	rootCmd.Flags().StringSliceVar(&corsOrigins, "cors-origin", splitEnv("OPENDOCS_CORS_ORIGINS"), "allow this exact origin to call the API from a browser (repeatable; e.g. https://opendocs.smithgajjar.dev). Default $OPENDOCS_CORS_ORIGINS, comma-separated")
 	rootCmd.Flags().BoolVar(&limits.TrustProxy, "trust-proxy", false, "take client IP from the last X-Forwarded-For hop (only behind your own reverse proxy)")
+	rootCmd.Flags().StringVar(&jwksURL, "auth-jwks-url", firstEnv("OPENDOCS_AUTH_JWKS_URL", "NEON_AUTH_JWKS_URL"), "enable optional sign-in: verify user tokens (Ed25519 JWTs, e.g. Neon Auth) against this JWKS URL (default $OPENDOCS_AUTH_JWKS_URL)")
+	rootCmd.Flags().StringVar(&authIssuer, "auth-issuer", os.Getenv("OPENDOCS_AUTH_ISSUER"), "if set, user tokens must carry exactly this issuer (default $OPENDOCS_AUTH_ISSUER)")
 	rootCmd.Flags().StringVar(&storeKind, "store", "sqlite", "document storage: sqlite (default), postgres, or fs (plain files)")
 	rootCmd.Flags().StringVar(&databaseURL, "database-url", os.Getenv("DATABASE_URL"), "PostgreSQL connection URL for --store postgres (default $DATABASE_URL)")
 	rootCmd.Flags().StringVar(&dataDir, "data", defaultDataDir(), "directory for documents, grants and the signing key")
+}
+
+func firstEnv(names ...string) string {
+	for _, n := range names {
+		if v := os.Getenv(n); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func splitEnv(name string) []string {
@@ -113,6 +127,7 @@ func run(cmd *cobra.Command, _ []string) error {
 	var (
 		st     store.Backend
 		grants auth.Grants
+		owners auth.Owners
 	)
 	switch storeKind {
 	case "sqlite":
@@ -121,7 +136,7 @@ func run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		defer db.Close()
-		st, grants = db, db.Grants()
+		st, grants, owners = db, db.Grants(), db.Owners()
 	case "postgres":
 		if databaseURL == "" {
 			return fmt.Errorf("--store postgres needs --database-url or $DATABASE_URL")
@@ -131,17 +146,27 @@ func run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 		defer db.Close()
-		st, grants = db, db.Grants()
+		st, grants, owners = db, db.Grants(), db.Owners()
 	case "fs":
 		st = store.NewWithBase(filepath.Join(dataDir, "docs")).Backend()
 		grants = auth.NewFileGrants(filepath.Join(dataDir, "grants.json"))
+		owners = auth.NewFileOwners(filepath.Join(dataDir, "owners.json"))
 	default:
 		return fmt.Errorf("unknown --store %q (want sqlite, postgres or fs)", storeKind)
 	}
 
+	px := server.NewProxy(st, grants, signer, version).WithLimits(limits).WithCORS(corsOrigins)
+	if jwksURL != "" {
+		u, err := url.Parse(jwksURL)
+		if err != nil || u.Host == "" || (u.Scheme != "https" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1") {
+			return fmt.Errorf("--auth-jwks-url must be an https URL: %q", jwksURL)
+		}
+		px.WithAccounts(auth.NewJWTVerifier(jwksURL, authIssuer), owners)
+		fmt.Fprintln(os.Stderr, "accounts: optional sign-in enabled")
+	}
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           server.NewProxy(st, grants, signer, version).WithLimits(limits).WithCORS(corsOrigins).Handler(),
+		Handler:           px.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,

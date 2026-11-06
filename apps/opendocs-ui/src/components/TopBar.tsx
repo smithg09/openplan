@@ -1,6 +1,7 @@
 import React from 'react';
 import { TopBar as SharedTopBar, Icon, MenuItem } from '@openplan/chrome';
 import type { Role } from '../api';
+import type { AccountUser } from '../account';
 import type { Theme } from '../lib/theme';
 
 export interface TopBarProps {
@@ -35,6 +36,8 @@ export interface TopBarProps {
   onShortcuts: () => void;
   /** Back to the documents home (absent when there is none, e.g. a proxy's own UI). */
   onHome?: () => void;
+  /** Present only when accounts are enabled in this build. */
+  account?: { user: AccountUser | null; onOpen: () => void };
 }
 
 export const TopBar: React.FC<TopBarProps> = (p) => (
@@ -89,6 +92,7 @@ export const TopBar: React.FC<TopBarProps> = (p) => (
         {p.canWrite && <MenuItem icon={<Icon name="upload" size={15} />} label="Upload new version" onClick={() => { close(); p.onUploadVersion(); }} />}
         <div className="op-menu-divider" />
         <MenuItem icon={<Icon name="keyboard" size={15} />} label="Keyboard shortcuts" hint="?" onClick={() => { close(); p.onShortcuts(); }} />
+        {p.account && <MenuItem icon={<Icon name="person" size={15} />} label={p.account.user ? 'Account' : 'Sign in'} hint={p.account.user?.email} onClick={() => { close(); p.account!.onOpen(); }} />}
         <MenuItem icon={<Icon name="settings" size={15} />} label="Settings" onClick={() => { close(); p.onSettings(); }} />
         <div className="op-menu-divider" />
         <a className="op-menu-item op-menu-link" href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" onClick={close}>
@@ -96,6 +100,6 @@ export const TopBar: React.FC<TopBarProps> = (p) => (
         </a>
       </>
     )}
-    avatar={{ name: p.author, onClick: p.onSettings }}
+    avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings }}
   />
 );

@@ -104,6 +104,22 @@ If Claude Code is found (`~/.claude`) the installer also installs the opendocs s
 
 ---
 
+## 6. Optional: sign-in with Neon Auth
+
+Accounts are optional. Anonymous links keep working; signing in adds an identity so published documents belong to the account and comments carry your verified name.
+
+1. In the Neon project, `neon deploy` with `auth: true` in `neon.ts` (already done) turns on managed Better Auth and writes `NEON_AUTH_BASE_URL` and `NEON_AUTH_JWKS_URL` to `.env.local`.
+2. Trust the origins that will host the sign-in forms (Neon redirects only to listed origins):
+
+   ```bash
+   neon neon-auth domain add https://opendocs.smithgajjar.dev
+   neon neon-auth domain add http://localhost:5195   # local development
+   ```
+
+3. **Render** (backend): add `OPENDOCS_AUTH_JWKS_URL` = the value of `NEON_AUTH_JWKS_URL`. Redeploy. The proxy now accepts user tokens; without it nothing changes.
+4. **Cloudflare Pages** (web app): add `VITE_NEON_AUTH_URL` = the value of `NEON_AUTH_BASE_URL` (a public URL, not a secret), then redeploy. The sign-in button appears once the variable is set.
+5. Production email: Neon's shared sender is for getting started only. Verification links need your own SMTP (Neon console → Auth → settings); see https://neon.com/docs/auth/production-checklist.md.
+
 ## Free alternatives for the backend and database
 
 | Option | Backend | Database | Verdict |

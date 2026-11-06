@@ -10,12 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@neon/auth": "^0.8.2",
     "@openplan/annotations": "workspace:*",
+    "@openplan/chrome": "workspace:*",
     "@openplan/shared": "workspace:*",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "@openplan/toolbar": "workspace:*",
-    "@openplan/chrome": "workspace:*"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.17",

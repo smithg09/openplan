@@ -1,11 +1,19 @@
 import React from 'react';
 import { TopBar as SharedTopBar, Icon, MenuItem, Button, Modal } from '@openplan/chrome';
 import { EXAMPLES, type Example } from '../examples';
-import { api, type SearchHit } from '../api';
+import { accountDocs, api, type SearchHit } from '../api';
+import { DEFAULT_PROXY } from '../env';
+import type { AccountUser } from '../account';
 import { htmlTitle } from '../lib/htmlmeta';
+import { USER_HEADER, userToken } from '../account';
 import type { LocalFolder } from '../lib/localfs';
 import { forgetShared, sharedHref, type SharedDoc } from '../lib/recent';
 import type { Theme } from '../lib/theme';
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const t = await userToken();
+  return t ? { [USER_HEADER]: t } : {};
+}
 
 interface Card { slug: string; title: string; versions: number; open: number; updatedAt: string }
 
@@ -37,6 +45,7 @@ interface Props {
   onSettings: () => void;
   onShortcuts: () => void;
   onForgot: () => void;
+  account?: { user: AccountUser | null; onOpen: () => void };
 }
 
 /** Documents home: everything on this device (and links opened here), searchable, one click to continue. */
@@ -57,6 +66,29 @@ export const Home: React.FC<Props> = (p) => {
     setBusy(true);
     try { await p.onDelete(pending.slug); setCards((cs) => (cs ?? []).filter((c) => c.slug !== pending.slug)); setPending(null); } finally { setBusy(false); }
   };
+  // Documents this account published (on the hosted proxy), only when signed in.
+  const [mine, setMine] = React.useState<{ id: string; title: string; createdAt: string }[] | null>(null);
+  const userId = p.account?.user?.id;
+  React.useEffect(() => {
+    if (!userId) { setMine(null); return; }
+    let live = true;
+    (async () => {
+      try {
+        const list = await accountDocs(DEFAULT_PROXY);
+        const out = await Promise.all(list.map(async (d) => {
+          try {
+            const vs = (await (await fetch(`${DEFAULT_PROXY}/api/docs/${d.id}/versions`, { headers: await authHeaders() })).json()) as { versions: { id: string }[] | null };
+            const head = vs.versions?.[vs.versions.length - 1];
+            const html = head ? await (await fetch(`${DEFAULT_PROXY}/api/docs/${d.id}/versions/${head.id}/raw`, { headers: await authHeaders() })).text() : '';
+            return { id: d.id, title: html ? htmlTitle(html, 'Untitled') : 'Untitled', createdAt: d.createdAt };
+          } catch { return { id: d.id, title: 'Untitled', createdAt: d.createdAt }; }
+        }));
+        if (live) setMine(out);
+      } catch { if (live) setMine([]); }
+    })();
+    return () => { live = false; };
+  }, [userId]);
+
   const first = p.author.trim().split(/\s+/)[0] || 'there';
 
   React.useEffect(() => {
@@ -127,10 +159,11 @@ export const Home: React.FC<Props> = (p) => {
             </div>
             <div className="op-menu-divider" />
             <MenuItem icon={<Icon name="keyboard" size={15} />} label="Keyboard shortcuts" hint="?" onClick={() => { close(); p.onShortcuts(); }} />
+            {p.account && <MenuItem icon={<Icon name="person" size={15} />} label={p.account.user ? 'Account' : 'Sign in'} hint={p.account.user?.email} onClick={() => { close(); p.account!.onOpen(); }} />}
             <MenuItem icon={<Icon name="settings" size={15} />} label="Settings" onClick={() => { close(); p.onSettings(); }} />
           </>
         )}
-        avatar={{ name: p.author, onClick: p.onSettings }}
+        avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings }}
       />
       <input ref={fileRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUpload(f); e.target.value = ''; }} />
       <div className="od-home">
@@ -152,6 +185,7 @@ export const Home: React.FC<Props> = (p) => {
                 <button className={view === 'grid' ? 'is-on' : ''} title="Card view" aria-label="Card view" onClick={() => setViewSaved('grid')}><Icon name="space_dashboard" size={15} /></button>
                 <button className={view === 'list' ? 'is-on' : ''} title="List view" aria-label="List view" onClick={() => setViewSaved('list')}><Icon name="format_list_bulleted" size={15} /></button>
               </div>
+              {p.account && !p.account.user && <Button kind="outline" size="md" icon={<Icon name="person" size={14} />} onClick={p.account.onOpen}>Sign in</Button>}
               <Button kind="outline" size="md" icon={<Icon name="upload" size={14} />} onClick={() => fileRef.current?.click()}>Upload HTML</Button>
               {p.fsSupported && <Button kind="outline" size="md" icon={<Icon name="folder" size={14} />} onClick={p.onPickFolder}>Open folder</Button>}
             </div>
@@ -181,6 +215,22 @@ export const Home: React.FC<Props> = (p) => {
                 </div>
               )}
               {cards !== null && cards.length > 0 && (view === 'grid' ? <div className="od-home-grid">{cards.map(docCard)}</div> : <div className="od-home-list">{cards.map(docCard)}</div>)}
+
+              {mine && mine.length > 0 && (
+                <section className="od-home-sec">
+                  <h3 className="od-home-h3">Published by you <span>{mine.length}</span></h3>
+                  <div className="od-home-list">
+                    {mine.map((d) => (
+                      <div key={d.id} className="od-home-row od-home-row-link">
+                        <a href={`${import.meta.env.BASE_URL}d/${encodeURIComponent(d.id)}?proxy=${encodeURIComponent(DEFAULT_PROXY)}`}>
+                          <span className="od-home-ico"><Icon name="link" size={16} /></span>
+                          <span className="od-home-row-main"><b>{d.title}</b><span>On the hosted proxy · published {ago(d.createdAt)}</span></span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {p.folder && (
                 <section className="od-home-sec">

@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documents home** in the web app and the local server: centered layout with an animated background, search every word, card or list view, upload an HTML file, open a folder, delete documents, collapsible examples, and reopen links you opened before
 - Publishing now **shares existing comments** along with the document, and links for the hosted proxy open on `opendocs.smithgajjar.dev/app` instead of the backend's host
 
+- **Optional accounts** with Neon Auth (managed Better Auth): sign in or create an account in the web app; documents you publish while signed in belong to you and open on any device without a link, are listed on your dashboard, and your comments carry your verified name. The proxy verifies user tokens with `--auth-jwks-url`; anonymous links work exactly as before
+
 ### Fixed
 
 - Sharing a document whose proxy copy was lost (e.g. after the proxy's storage was reset) failed with a 401; publishing now recreates it, and copying a link says what to do

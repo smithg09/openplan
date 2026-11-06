@@ -259,7 +259,7 @@ Hardening around that (all in `internal/opendocs/server`, each with tests):
 server — same module, own release tarball (`opendocs-proxy_<os>_<arch>.tar.gz`), serves the same embedded
 opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) is unchanged and acts as an editor.
 
-- **Capability links, no accounts.** `POST /api/docs` mints an opaque doc id + editor token (the only
+- **Capability links; accounts are optional.** `POST /api/docs` mints an opaque doc id + editor token (the only
   unauthenticated write). Editors mint viewer/commenter/editor tokens via `POST .../shares`. Tokens are
   256-bit, sent as `Authorization: Bearer`, **only their sha256 is stored** (`auth/`). The proxy has no
   "list all docs" endpoint; an unknown doc and a bad token both return 401 so ids can't be probed.
@@ -339,7 +339,8 @@ opendocs-ui. Built with `server.NewProxy(...)`; the local server (`server.New`) 
   `opendocs install`: claude → `~/.claude/skills`, codex → `~/.codex/skills`, agy → `~/.gemini/skills` (global only).
   **Copilot is deliberately unsupported** (no verified skills directory on this machine); `TestSkillsReferenceRealCommands`
   fails if a skill mentions an `opendocs` subcommand that doesn't exist.
-- **Search is local-only by design:** the proxy has no accounts, so there is no "my documents" set to search
+- **Optional accounts (Neon Auth / managed Better Auth).** Off unless the proxy gets `--auth-jwks-url` (`$OPENDOCS_AUTH_JWKS_URL`, optional `--auth-issuer`) and the web build gets `VITE_NEON_AUTH_URL`. Signed-in callers send their short-lived (15 min, Ed25519) token in **`X-Opendocs-User`** — never `Authorization`, which carries the capability link; both may be present. `auth/jwt.go` is a stdlib-only verifier (EdDSA only, `kid` lookup with rate-limited JWKS refetch, `exp`/`nbf` with skew). `auth.Owners` (fs `owners.json`, SQL `doc_owners`) records which documents an account published: the owner is an editor of them without a link, `GET /api/me/docs` lists only their own, `POST /api/docs/{doc}/claim` attaches an existing doc, and their comments get owner `user:<sub>` (so `mine` follows the account) and the verified name as author. Anonymous use is unchanged. The local server ignores all of this.
+- **Search is local-only by design:** the proxy has no accounts to search across (even with optional sign-in there is no list-all endpoint), so there is no "my documents" set to search
   (a capability link reaches exactly one doc); `TestProxyHasNoSearch` pins that. It scans head versions in
   memory (fine for a personal doc set); no index, so no Postgres tsvector/SQLite FTS yet.
 - Not done yet: TLS termination in the binary (use a reverse proxy / the host's), folders/labels/search, a

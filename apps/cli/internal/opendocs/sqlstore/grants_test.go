@@ -86,3 +86,24 @@ func TestPostgresGrants(t *testing.T) {
 	db.db.DB.Exec(`TRUNCATE grants`)
 	grantsContract(t, db.Grants(), nil)
 }
+
+func TestSQLiteOwners(t *testing.T) {
+	db, err := OpenSQLite(filepath.Join(t.TempDir(), "o.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	o := db.Owners()
+	for _, p := range [][2]string{{"u1", "d1"}, {"u1", "d1"}, {"u1", "d2"}, {"u2", "d3"}} {
+		if err := o.Add(p[0], p[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	docs, err := o.Docs("u1")
+	if err != nil || len(docs) != 2 {
+		t.Fatalf("u1 docs = %v, %v", docs, err)
+	}
+	if !o.Owns("u2", "d3") || o.Owns("u2", "d1") || o.Owns("nobody", "d1") {
+		t.Error("ownership leaked across users")
+	}
+}

@@ -43,6 +43,8 @@ type Server struct {
 
 	// Proxy mode (nil/unset for the local server): see access.go.
 	grants      auth.Grants
+	users       *auth.JWTVerifier // optional accounts (proxy mode)
+	owners      auth.Owners
 	signer      *auth.Signer
 	hub         *hub
 	corsOrigins map[string]bool
@@ -81,6 +83,9 @@ func (s *Server) Handler() http.Handler {
 	if s.multiTenant() {
 		// Opaque server-minted ids; no listing of other people's documents.
 		mux.HandleFunc("POST /api/docs", s.handleCreateDoc)
+		mux.HandleFunc("GET /api/me", s.handleMe)
+		mux.HandleFunc("GET /api/me/docs", s.handleMyDocs)
+		mux.HandleFunc("POST /api/docs/{doc}/claim", s.guard(auth.ActWrite, s.handleClaim))
 		mux.HandleFunc("GET /api/docs/{doc}/shares", s.guard(auth.ActWrite, s.handleListShares))
 		mux.HandleFunc("POST /api/docs/{doc}/shares", s.guard(auth.ActWrite, s.handleMintShare))
 		mux.HandleFunc("DELETE /api/docs/{doc}/shares/{id}", s.guard(auth.ActWrite, s.handleRevokeShare))
@@ -430,6 +435,9 @@ func (s *Server) handleAddComment(w http.ResponseWriter, r *http.Request, p prin
 		return
 	}
 	c.Owner = p.hash // never trust a client-supplied owner
+	if p.user != nil && p.user.Name != "" {
+		c.Author = p.user.Name // a verified name beats a typed one
+	}
 	if s.limits.MaxCommentLen > 0 && len(c.Body) > s.limits.MaxCommentLen {
 		writeErr(w, http.StatusRequestEntityTooLarge, errors.New("comment too long"))
 		return
