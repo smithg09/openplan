@@ -2,9 +2,10 @@ import React from 'react';
 import { signIn, signInWithProvider, signOut, signUp, type AccountUser } from '../account';
 import { localAuthor, setLocalAuthor } from '../adapt';
 import { Button, Icon, Modal } from './ui';
+import { ProxyField } from './ProxyModal';
 
 /** Sign in, create an account, or manage the current one. Accounts are optional. */
-export const AccountModal: React.FC<{ user: AccountUser | null; onClose: () => void; onChanged: () => void; onAuthorChange: (name: string) => void }> = ({ user, onClose, onChanged, onAuthorChange }) => {
+export const AccountModal: React.FC<{ mode: 'local' | 'proxy'; user: AccountUser | null; onClose: () => void; onChanged: () => void; onAuthorChange: (name: string) => void }> = ({ mode, user, onClose, onChanged, onAuthorChange }) => {
   const [display, setDisplay] = React.useState(localAuthor());
   const saveName = () => { const n = display.trim() || 'You'; setLocalAuthor(n); onAuthorChange(n); };
   const [tab, setTab] = React.useState<'in' | 'up'>('in');
@@ -31,6 +32,8 @@ export const AccountModal: React.FC<{ user: AccountUser | null; onClose: () => v
         foot={<><div style={{ flex: 1 }} /><Button kind="outline" size="md" onClick={async () => { await signOut().catch(() => {}); onChanged(); onClose(); }}>Sign out</Button></>}>
         <p style={{ margin: 0, lineHeight: 1.6 }}><b>{user.name}</b><br /><span style={{ color: 'var(--text-muted)' }}>{user.email}</span></p>
         <p className="od-hint">Documents you publish while signed in belong to this account and open on any device. Your comments show your name.</p>
+        <div className="od-auth-or"><span>sharing proxy</span></div>
+        <ProxyField mode={mode} />
       </Modal>
     );
   }
@@ -41,6 +44,8 @@ export const AccountModal: React.FC<{ user: AccountUser | null; onClose: () => v
         <input className="od-input" value={display} onChange={(e) => setDisplay(e.target.value)} onBlur={saveName} onKeyDown={(e) => { if (e.key === 'Enter') { saveName(); (e.target as HTMLInputElement).blur(); } }} />
         <p className="od-hint">Shown on your comments. You don't need an account to use opendocs.</p>
       </div>
+      <div className="od-auth-or"><span>sharing proxy</span></div>
+      <ProxyField mode={mode} />
       <p className="od-hint" style={{ margin: '18px 0 10px' }}>Sign in to keep your published documents across devices.</p>
       <Button kind="outline" size="lg" disabled={busy} style={{ width: '100%', justifyContent: 'center' }} icon={<Icon name="github" size={15} />}
         onClick={async () => { setBusy(true); setErr(''); try { await signInWithProvider('github'); } catch (ex) { setErr(ex instanceof Error ? ex.message : String(ex)); setBusy(false); } }}>
