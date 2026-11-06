@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/remote"
+	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
 
 // A local server publishing to a real proxy handler.
@@ -129,4 +130,55 @@ func noHosted(t *testing.T) {
 	saved := remote.HostedURL
 	remote.HostedURL = ""
 	t.Cleanup(func() { remote.HostedURL = saved })
+}
+
+func TestPublishCarriesLocalCommentsAcrossOnce(t *testing.T) {
+	s, ts, st := localWithProxy(t)
+	h := s.Handler()
+	t.Setenv("OPENDOCS_PROXY", "")
+	noHosted(t)
+
+	d := s.store.Doc("proj", "report")
+	root, err := d.AddComment(store.Comment{Body: "why eleven minutes?", Type: "question", Author: "Smith",
+		Anchor: &store.Anchor{Quote: "hello share", Start: 3, End: 14}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.AddComment(store.Comment{Body: "the lock", Author: "Smith", RootCommentID: root.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	first := decode[map[string]any](t, do(t, h, "POST", "/api/docs/report/publish", map[string]string{"proxy": ts.URL}))
+	if first["comments"] != float64(2) {
+		t.Fatalf("first publish synced %v comments, want 2 (%v)", first["comments"], first)
+	}
+	p, _, _ := st.Lookup("doc:proj/report")
+	c, _ := remote.NewClient(ts.URL)
+	remoteComments, err := c.Comments(p.ID, p.EditorToken)
+	if err != nil || len(remoteComments) != 2 {
+		t.Fatalf("remote comments = %v, %v", remoteComments, err)
+	}
+	var rRoot, rReply store.Comment
+	for _, rc := range remoteComments {
+		if rc.RootCommentID == "" {
+			rRoot = rc
+		} else {
+			rReply = rc
+		}
+	}
+	if rRoot.Type != "question" || rRoot.Anchor == nil || rRoot.Anchor.Quote != "hello share" || rReply.RootCommentID != rRoot.ID {
+		t.Errorf("thread not preserved: root=%+v reply=%+v", rRoot, rReply)
+	}
+
+	// Publishing again must not duplicate them; a new local comment goes across.
+	if _, err := d.AddComment(store.Comment{Body: "new one", Author: "Smith", Anchor: &store.Anchor{Quote: "hello", Start: 3, End: 8}}); err != nil {
+		t.Fatal(err)
+	}
+	second := decode[map[string]any](t, do(t, h, "POST", "/api/docs/report/publish", map[string]string{}))
+	if second["comments"] != float64(1) {
+		t.Errorf("republish synced %v comments, want 1", second["comments"])
+	}
+	if all, _ := c.Comments(p.ID, p.EditorToken); len(all) != 3 {
+		t.Errorf("remote has %d comments after republish, want 3", len(all))
+	}
 }

@@ -54,6 +54,7 @@ export function threadToAnnotation(t: Thread, me: string): Annotation {
     id: c.id,
     type: c.type ?? 'comment',
     suggestion: c.suggestion,
+    emoji: c.type === 'emoji' ? c.body : undefined,
     selectedText: c.anchor?.quote ?? '',
     from: 0,
     to: 0,

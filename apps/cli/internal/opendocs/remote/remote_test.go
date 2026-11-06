@@ -33,6 +33,21 @@ func TestShareURLKeepsTokenInFragment(t *testing.T) {
 	}
 }
 
+func TestShareURLForHostedProxyPointsAtTheWebApp(t *testing.T) {
+	savedU, savedA := HostedURL, HostedAppURL
+	t.Cleanup(func() { HostedURL, HostedAppURL = savedU, savedA })
+	HostedURL, HostedAppURL = "https://proxy.example.com", "https://docs.example.com/app"
+	c, _ := NewClient("https://proxy.example.com")
+	want := "https://docs.example.com/app/d/abc?proxy=https%3A%2F%2Fproxy.example.com#t=tok"
+	if u := c.ShareURL("abc", "tok"); u != want {
+		t.Errorf("ShareURL = %s, want %s", u, want)
+	}
+	other, _ := NewClient("https://self.hosted.dev")
+	if u := other.ShareURL("abc", "tok"); u != "https://self.hosted.dev/d/abc#t=tok" {
+		t.Errorf("self-hosted proxy link changed: %s", u)
+	}
+}
+
 func TestStateProxyResolution(t *testing.T) {
 	st := NewStateAt(filepath.Join(t.TempDir(), "s", "state.json"))
 	t.Setenv("OPENDOCS_PROXY", "")

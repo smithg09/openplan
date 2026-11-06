@@ -210,7 +210,8 @@
       var node = seg.node;
       var mid = node.splitText(from);
       mid.splitText(to - from);
-      var span = document.createElement("span");
+      // A custom element, not <span>: documents often style bare `span` (e.g. `.stats span`).
+      var span = document.createElement("opendocs-hl");
       span.className = HL_CLASS;
       span.setAttribute("data-anchor-id", id);
       if (status) span.setAttribute("data-status", status);

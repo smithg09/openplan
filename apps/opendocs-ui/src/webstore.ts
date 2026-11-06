@@ -5,9 +5,10 @@
 // publish them to a proxy. It implements the same surface as the HTTP client so
 // the UI does not know which one it is talking to.
 import sampleHTML from '../../cli/internal/opendocs/sample/retry-storm.html?raw';
-import { DEFAULT_PROXY } from './env';
+import { DEFAULT_PROXY, capabilityLink } from './env';
 import { buildFrame } from './frame';
-import { normalizeProxy, type Api, type ApiComment, type ApiVersion, type Role } from './api';
+import { htmlText, htmlTitle } from './lib/htmlmeta';
+import { normalizeProxy, type SearchHit, type Api, type ApiComment, type ApiVersion, type Role } from './api';
 
 const DB = 'opendocs-web';
 const SAMPLE_SLUG = 'retry-storm';
@@ -74,7 +75,7 @@ async function seedSampleOnce() {
 }
 
 // ── sharing: browser → proxy, over CORS ─────────────────────────────────────
-interface Published { proxy: string; id: string; editorToken: string }
+interface Published { proxy: string; id: string; editorToken: string; comments?: Record<string, string> }
 
 async function proxyCall<T>(base: string, method: string, path: string, token: string | null, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
@@ -98,6 +99,29 @@ async function configuredProxy(): Promise<string> {
   return (await meta<string>('proxy')) || DEFAULT_PROXY;
 }
 
+/** Send comments the proxy hasn't seen (threads before replies) so the shared link shows the review so far. */
+async function syncComments(doc: string, pub: Published): Promise<{ comments: number; commentsError?: string }> {
+  const done: Record<string, string> = { ...(pub.comments ?? {}) };
+  const all = (await getAll<CommentRow>('comments', doc)).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  let sent = 0;
+  let error: string | undefined;
+  try {
+    for (const c of [...all.filter((x) => !x.rootCommentId), ...all.filter((x) => x.rootCommentId)]) {
+      if (done[c.id]) continue;
+      let root: string | undefined;
+      if (c.rootCommentId) { root = done[c.rootCommentId]; if (!root) continue; }
+      const saved = await proxyCall<{ id: string }>(pub.proxy, 'POST', `/api/docs/${encodeURIComponent(pub.id)}/comments`, pub.editorToken, {
+        body: c.body, type: c.type, suggestion: c.suggestion, anchor: c.anchor, author: c.author, createdOnVersionId: c.createdOnVersionId, rootCommentId: root, status: 'open',
+      });
+      done[c.id] = saved.id;
+      sent++;
+      if (c.status === 'resolved') await proxyCall(pub.proxy, 'POST', `/api/docs/${encodeURIComponent(pub.id)}/comments/${encodeURIComponent(saved.id)}/status`, pub.editorToken, { status: 'resolved' }).catch(() => {});
+    }
+  } catch (e) { error = e instanceof Error ? e.message : String(e); }
+  await setMeta(`published:${doc}`, { ...pub, comments: done } satisfies Published);
+  return error ? { comments: sent, commentsError: error } : { comments: sent };
+}
+
 export const webLocalApi: Api = {
   session: async () => ({ project: 'browser', focus: '', version: 'web', mode: 'local' as const }),
   access: async () => ({ role: 'editor' as Role }),
@@ -112,6 +136,23 @@ export const webLocalApi: Api = {
     await seedSampleOnce();
     const all = await done<{ slug: string }[]>((await store('docs')).getAll() as IDBRequest<{ slug: string }[]>);
     return { docs: all.map((d) => d.slug).sort() };
+  },
+  search: async (q) => {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    const results: SearchHit[] = [];
+    const slugs = (await done<{ slug: string }[]>((await store('docs')).getAll() as IDBRequest<{ slug: string }[]>)).map((d) => d.slug);
+    for (const slug of slugs) {
+      const head = (await versionsOf(slug)).pop();
+      if (!head) continue;
+      const title = htmlTitle(head.html, slug);
+      const text = htmlText(head.html);
+      const hay = `${title} ${text}`.toLowerCase();
+      if (!words.every((w) => hay.includes(w))) continue;
+      const at = words.length ? text.toLowerCase().indexOf(words[0]) : -1;
+      const snippet = at < 0 ? '' : (at > 40 ? '…' : '') + text.slice(Math.max(0, at - 40), at + 110) + '…';
+      results.push({ doc: slug, title, versionId: head.id, snippet, score: words.reduce((n, w) => n + (title.toLowerCase().includes(w) ? 3 : 1), 0) });
+    }
+    return { results: results.sort((a, b) => b.score - a.score) };
   },
   listVersions: async (doc) => ({ versions: (await versionsOf(doc)).map(strip) }),
   createVersion: (doc, b) => addVersion(doc, b.html, b.label, b.summary, b.expectedHead),
@@ -170,18 +211,19 @@ export const webLocalApi: Api = {
     const prev = await meta<Published>(`published:${doc}`);
     if (prev && prev.proxy === proxy) {
       await proxyCall(proxy, 'POST', `/api/docs/${encodeURIComponent(prev.id)}/versions`, prev.editorToken, { html: head.html, label: head.label ?? '', summary: '' });
-      return { id: prev.id, proxy, new: false };
+      return { id: prev.id, proxy, new: false, ...(await syncComments(doc, prev)) };
     }
     const created = await proxyCall<{ id: string; editorToken: string }>(proxy, 'POST', '/api/docs', null, { html: head.html, label: head.label ?? '', summary: '' });
     // The editor token is kept in this browser's storage (there is no server to hold it).
-    await setMeta(`published:${doc}`, { proxy, id: created.id, editorToken: created.editorToken } satisfies Published);
-    return { id: created.id, proxy, new: true };
+    const pub: Published = { proxy, id: created.id, editorToken: created.editorToken };
+    await setMeta(`published:${doc}`, pub);
+    return { id: created.id, proxy, new: true, ...(await syncComments(doc, pub)) };
   },
   remoteLink: async (doc, role) => {
     const p = await meta<Published>(`published:${doc}`);
     if (!p) throw new Error('publish this document first');
     const r = await proxyCall<{ token: string }>(p.proxy, 'POST', `/api/docs/${encodeURIComponent(p.id)}/shares`, p.editorToken, { role, label: `${role} link` });
-    return { link: `${p.proxy}/d/${encodeURIComponent(p.id)}#t=${encodeURIComponent(r.token)}`, role };
+    return { link: capabilityLink(p.proxy, p.id, r.token), role };
   },
   listShares: async () => ({ shares: [] }),
   mintShare: async () => { throw new Error('manage links from the shared document'); },

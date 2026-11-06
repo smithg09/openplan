@@ -44,6 +44,8 @@ export interface ApiVersion {
   summary?: string;
 }
 
+export interface SearchHit { doc: string; title: string; versionId: string; snippet: string; score: number }
+
 export interface ApiSession {
   project: string;
   focus: string;
@@ -89,6 +91,9 @@ export function loadToken(doc: string): void {
 // UI). In the hosted web app a shared document is read from a proxy origin.
 let apiBase = '';
 export function setApiBase(base: string): void { apiBase = base.replace(/\/$/, ''); }
+/** Where the current page's API lives, for remembering a shared document. */
+export function currentApiBase(): string { return apiBase; }
+export function currentToken(): string { return activeToken; }
 export function shareOrigin(): string { return apiBase || window.location.origin; }
 const resolve = (p: string) => apiBase + p;
 
@@ -138,7 +143,7 @@ export const httpApi = {
   remoteStatus: (doc: string) =>
     req<{ published: boolean; proxy?: string; id?: string }>('GET', `/api/docs/${encodeURIComponent(doc)}/remote`),
   publish: (doc: string, proxy?: string) =>
-    req<{ id: string; proxy: string; new: boolean }>('POST', `/api/docs/${encodeURIComponent(doc)}/publish`, { proxy: proxy ?? '' }),
+    req<{ id: string; proxy: string; new: boolean; comments?: number; commentsError?: string }>('POST', `/api/docs/${encodeURIComponent(doc)}/publish`, { proxy: proxy ?? '' }),
   remoteLink: (doc: string, role: Role) =>
     req<{ link: string; role: Role }>('POST', `/api/docs/${encodeURIComponent(doc)}/remote/links`, { role }),
   // Proxy mode (editors): manage this document's share links.
@@ -162,6 +167,7 @@ export const httpApi = {
   },
   sample: () => req<{ slug: string; html: string }>('GET', '/api/sample'),
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
+  search: (q: string) => req<{ results: SearchHit[] | null }>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),
   listComments: (doc: string) =>

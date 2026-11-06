@@ -25,6 +25,11 @@ import (
 // a variable only so tests can blank it.
 var HostedURL = "https://opendocs-proxy.onrender.com"
 
+// HostedAppURL is the hosted web app (Cloudflare Pages) that can open documents on
+// HostedURL. Share links for the hosted proxy point here, so people land on the
+// project's own domain instead of the backend's *.onrender.com host.
+var HostedAppURL = "https://opendocs.smithgajjar.dev/app"
+
 // ErrNoProxy means no proxy is configured and there is no hosted default.
 var ErrNoProxy = errors.New("no proxy configured (use --proxy, $OPENDOCS_PROXY, or `opendocs config proxy <url>`)")
 
@@ -122,6 +127,19 @@ func (c *Client) Comments(doc, token string) ([]store.Comment, error) {
 	return out.Comments, err
 }
 
+// AddComment posts a comment (or reply, when RootCommentID is set) as the token's holder.
+func (c *Client) AddComment(doc, token string, in store.Comment) (store.Comment, error) {
+	in.Owner = ""
+	var out store.Comment
+	err := c.do("POST", "/api/docs/"+url.PathEscape(doc)+"/comments", token, in, &out)
+	return out, err
+}
+
+// SetCommentStatus opens or resolves a comment.
+func (c *Client) SetCommentStatus(doc, token, id, status string) error {
+	return c.do("POST", "/api/docs/"+url.PathEscape(doc)+"/comments/"+url.PathEscape(id)+"/status", token, map[string]string{"status": status}, nil)
+}
+
 // Head returns the id of the newest version.
 func (c *Client) Head(doc, token string) (string, error) {
 	var out struct {
@@ -148,6 +166,9 @@ func (c *Client) MintShare(doc, token, role, label string) (string, error) {
 // ShareURL builds the capability link for a token. The token is in the
 // fragment so it is never sent to a server or logged.
 func (c *Client) ShareURL(doc, token string) string {
+	if HostedURL != "" && HostedAppURL != "" && c.Base == strings.TrimRight(HostedURL, "/") {
+		return strings.TrimRight(HostedAppURL, "/") + "/d/" + url.PathEscape(doc) + "?proxy=" + url.QueryEscape(c.Base) + "#t=" + url.QueryEscape(token)
+	}
 	return c.Base + "/d/" + url.PathEscape(doc) + "#t=" + url.QueryEscape(token)
 }
 
@@ -158,6 +179,9 @@ type Published struct {
 	Proxy       string `json:"proxy"`
 	ID          string `json:"id"`
 	EditorToken string `json:"editorToken"`
+	// Comments maps local comment ids to their ids on the proxy, so re-publishing
+	// sends only comments the proxy has not seen.
+	Comments map[string]string `json:"comments,omitempty"`
 }
 
 type state struct {

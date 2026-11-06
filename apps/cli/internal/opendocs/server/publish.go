@@ -8,6 +8,7 @@ import (
 
 	"github.com/smithg09/openplan/cli/internal/opendocs/auth"
 	"github.com/smithg09/openplan/cli/internal/opendocs/remote"
+	"github.com/smithg09/openplan/cli/internal/opendocs/store"
 )
 
 // Local-mode sharing: the local UI can set a proxy and publish a document to
@@ -121,7 +122,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{"proxy": c.Base}
+	var pub remote.Published
 	if published {
+		pub = prev
 		v, err := c.PublishVersion(prev.ID, prev.EditorToken, string(content), head.Label, req.Summary)
 		if err != nil {
 			writeErr(w, http.StatusBadGateway, err)
@@ -134,13 +137,74 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadGateway, err)
 			return
 		}
-		if err := st.Remember(key, remote.Published{Proxy: c.Base, ID: created.ID, EditorToken: created.EditorToken}); err != nil {
+		pub = remote.Published{Proxy: c.Base, ID: created.ID, EditorToken: created.EditorToken}
+		if err := st.Remember(key, pub); err != nil {
 			writeErr(w, http.StatusInternalServerError, err)
 			return
 		}
 		resp["id"], resp["new"] = created.ID, true
 	}
+
+	// Carry the local review along: people opening the shared link should see the
+	// comments already made. A failure here doesn't undo the publish.
+	n, err := syncComments(c, d, st, key, pub)
+	resp["comments"] = n
+	if err != nil {
+		resp["commentsError"] = err.Error()
+	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// syncComments posts local comments the proxy has not seen (threads before their
+// replies) and remembers the id mapping. It returns how many were sent.
+func syncComments(c *remote.Client, d store.DocStore, st *remote.State, key string, pub remote.Published) (int, error) {
+	local, err := d.ListComments()
+	if err != nil {
+		return 0, err
+	}
+	if pub.Comments == nil {
+		pub.Comments = map[string]string{}
+	}
+	sent := 0
+	var firstErr error
+	send := func(in store.Comment) {
+		if _, done := pub.Comments[in.ID]; done || firstErr != nil {
+			return
+		}
+		localID, status := in.ID, in.Status
+		if in.RootCommentID != "" {
+			root, ok := pub.Comments[in.RootCommentID]
+			if !ok {
+				return
+			}
+			in.RootCommentID = root
+		}
+		in.ID = ""
+		saved, err := c.AddComment(pub.ID, pub.EditorToken, in)
+		if err != nil {
+			firstErr = err
+			return
+		}
+		pub.Comments[localID] = saved.ID
+		sent++
+		if status == store.StatusResolved {
+			_ = c.SetCommentStatus(pub.ID, pub.EditorToken, saved.ID, status)
+		}
+	}
+	for _, cm := range local {
+		if cm.RootCommentID == "" {
+			send(cm)
+		}
+	}
+	for _, cm := range local {
+		if cm.RootCommentID != "" {
+			send(cm)
+		}
+	}
+	if err := st.Remember(key, pub); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return sent, firstErr
 }
 
 // handleRemoteLink mints a fresh share link for the published document. Each call

@@ -1,8 +1,11 @@
 import React from 'react';
 import { SelectionToolbar, CommentPopover, SuggestionPopover } from '@openplan/toolbar';
-import { api, bootstrap, captureToken, docFromPath, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
+import { api, bootstrap, captureToken, currentApiBase, currentToken, docFromPath, loadToken, subscribe, type ApiAnchor, type ApiComment, type ApiVersion, type Role } from './api';
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
 import { TopBar } from './components/TopBar';
+import { Home } from './components/Home';
+import { WEB } from './env';
+import { listShared, rememberShared, type SharedDoc } from './lib/recent';
 import { LeftPanel, type Heading } from './components/LeftPanel';
 import { AnchoredRail, type RailItem } from './components/AnchoredRail';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
@@ -56,10 +59,13 @@ export default function App() {
   const [folder, setFolder] = React.useState<LocalFolder | null>(null);
   const [importing, setImporting] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState('');
+  const [view, setView] = React.useState<'home' | 'doc'>('doc');
+  const [shared, setShared] = React.useState<SharedDoc[]>(() => listShared());
 
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const paneRef = React.useRef<HTMLDivElement>(null);
   const uploadRef = React.useRef<HTMLInputElement>(null);
+  const railHeadRef = React.useRef<HTMLDivElement>(null);
   const commentsRef = React.useRef(comments);
   commentsRef.current = comments;
   const roleRef = React.useRef(role);
@@ -91,6 +97,16 @@ export default function App() {
     return () => mq.removeEventListener('change', on);
   }, [theme, setTheme]);
 
+  React.useEffect(() => {
+    const el = railHeadRef.current;
+    if (!el) return;
+    const measure = () => setRailHead(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [railOpen, focusMode, loading]);
+
   // ── data ────────────────────────────────────────────────────────────────────
   const refreshComments = React.useCallback(async (doc: string) => {
     const { comments } = await api.listComments(doc);
@@ -107,6 +123,7 @@ export default function App() {
   }, []);
 
   const openDoc = React.useCallback(async (doc: string) => {
+    setView('doc');
     setSel(null); setComposer(null); setFocusId(null); setOrphans(new Set());
     setFrameHtml(''); setNewVersion(false); setLayout({ scrollTop: 0, scrollHeight: 0, anchors: {}, headings: [] });
     setDocSlug(doc);
@@ -129,9 +146,9 @@ export default function App() {
         } else {
           const { docs } = await api.listDocs();
           setDocs(docs ?? []);
-          if (!doc) doc = (docs && docs[0]) || '';
         }
         if (doc) await openDoc(doc);
+        else setView('home');
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -139,6 +156,23 @@ export default function App() {
       }
     })();
   }, [openDoc]);
+
+  // Remember documents opened from a share link so the home page can take people back.
+  const title0 = layout.headings.find((h) => h.level === 1)?.text || '';
+  React.useEffect(() => {
+    if (!WEB || mode !== 'proxy' || !docSlug) return;
+    rememberShared({ id: docSlug, proxy: currentApiBase(), token: currentToken(), role, title: title0 });
+    setShared(listShared());
+  }, [mode, docSlug, role, title0]);
+
+  const goHome = React.useCallback(async () => {
+    if (mode === 'proxy') { window.location.assign(import.meta.env.BASE_URL); return; }
+    try { setDocs((await api.listDocs()).docs ?? []); } catch { /* keep the old list */ }
+    setShared(listShared());
+    setDocSlug(''); setFrameHtml(''); setCurrentVersionId(''); setModal(null);
+    if (WEB) history.replaceState(null, '', import.meta.env.BASE_URL);
+    setView('home');
+  }, [mode]);
 
   // The sandboxed iframe never makes a request of its own: the page fetches the
   // (bridge-injected) HTML as text — with the bearer token where needed — and hands
@@ -314,6 +348,24 @@ export default function App() {
   if (loading) return <div className="op-loading-center"><div className="op-spinner" /></div>;
   if (error) return <div className="od-fatal"><Icon name="warning" size={20} /><div>{error}</div></div>;
 
+  if (view === 'home') {
+    return (
+      <>
+        <Home
+          docs={docs} shared={shared} fsSupported={fsAccessSupported()} author={author} theme={theme}
+          onOpen={(slug) => { if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(slug)}`); void openDoc(slug); }}
+          onOpenSample={() => void openSample()}
+          onPickFolder={async () => { try { const f = await pickFolder(); if (f) { setFolder(f); setDocSlug(''); setView('doc'); } } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } }}
+          onSetTheme={setTheme} onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
+          onForgot={() => setShared(listShared())}
+        />
+        {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+        {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
+        {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
+      </>
+    );
+  }
+
   const threads = buildThreads(comments);
   const openCount = threads.filter((t) => t.root.status !== 'resolved').length;
   const counts = { all: threads.length, open: openCount, resolved: threads.length - openCount };
@@ -358,6 +410,7 @@ export default function App() {
         onSetTheme={setTheme} onExportMd={exportMd} onExportJson={exportJson} onDownloadHtml={() => void downloadHtml()}
         onPrint={() => postToFrame({ type: 'opendocs:print' })} onUploadVersion={() => uploadRef.current?.click()}
         onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
+        onHome={mode === 'local' || WEB ? () => void goHome() : undefined}
       />
       <input ref={uploadRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadFile(f); e.target.value = ''; }} />
 
@@ -366,7 +419,7 @@ export default function App() {
           <LeftPanel
             mode={mode} docs={docs} currentDoc={docSlug} headings={layout.headings} scrollTop={layout.scrollTop}
             folder={folder} fsSupported={fsAccessSupported()} openCounts={{ [docSlug]: openCount }} importing={importing}
-            onOpenDoc={(d) => { void openDoc(d); }} onHeading={(id) => postToFrame({ type: 'opendocs:scroll-to-heading', id })}
+            onOpenDoc={(d) => { if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(d)}`); void openDoc(d); }} onHeading={(id) => postToFrame({ type: 'opendocs:scroll-to-heading', id })}
             onPickFolder={async () => { try { const f = await pickFolder(); if (f) setFolder(f); } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } }}
             onOpenLocalFile={(p) => { void openLocalFile(p); }}
           />
@@ -390,7 +443,7 @@ export default function App() {
 
         <SlidePanel open={showRail} side="right" width={340}>
           <div className="od-rail">
-            <div ref={(el) => { if (el && el.offsetHeight !== railHead) setRailHead(el.offsetHeight); }}>
+            <div ref={railHeadRef}>
               <RailHeader count={openCount} filter={filter} counts={counts} onFilter={setFilter} onCopyMD={() => { void navigator.clipboard.writeText(commentsToMarkdown(title, comments)).then(() => showToast('Comments copied as Markdown')); }} onClose={() => setRailOpen(false)} />
             </div>
             {items.length === 0 && (
