@@ -43,6 +43,7 @@ interface Props {
   onCloseFolder: () => void;
   onSetTheme: (t: Theme) => void;
   onSettings: () => void;
+  onProxy: () => void;
   onShortcuts: () => void;
   onForgot: () => void;
   account?: { user: AccountUser | null; onOpen: () => void };
@@ -160,6 +161,7 @@ export const Home: React.FC<Props> = (p) => {
             <div className="op-menu-divider" />
             <MenuItem icon={<Icon name="keyboard" size={15} />} label="Keyboard shortcuts" hint="?" onClick={() => { close(); p.onShortcuts(); }} />
             {p.account && <MenuItem icon={<Icon name="person" size={15} />} label={p.account.user ? 'Account' : 'Sign in'} hint={p.account.user?.email} onClick={() => { close(); p.account!.onOpen(); }} />}
+            <MenuItem icon={<Icon name="link" size={15} />} label="Proxy" onClick={() => { close(); p.onProxy(); }} />
             <MenuItem icon={<Icon name="settings" size={15} />} label="Settings" onClick={() => { close(); p.onSettings(); }} />
           </>
         )}

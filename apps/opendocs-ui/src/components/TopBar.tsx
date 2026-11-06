@@ -33,6 +33,7 @@ export interface TopBarProps {
   onPrint: () => void;
   onUploadVersion: () => void;
   onSettings: () => void;
+  onProxy: () => void;
   onShortcuts: () => void;
   /** Back to the documents home (absent when there is none, e.g. a proxy's own UI). */
   onHome?: () => void;
@@ -93,6 +94,7 @@ export const TopBar: React.FC<TopBarProps> = (p) => (
         <div className="op-menu-divider" />
         <MenuItem icon={<Icon name="keyboard" size={15} />} label="Keyboard shortcuts" hint="?" onClick={() => { close(); p.onShortcuts(); }} />
         {p.account && <MenuItem icon={<Icon name="person" size={15} />} label={p.account.user ? 'Account' : 'Sign in'} hint={p.account.user?.email} onClick={() => { close(); p.account!.onOpen(); }} />}
+        <MenuItem icon={<Icon name="link" size={15} />} label="Proxy" onClick={() => { close(); p.onProxy(); }} />
         <MenuItem icon={<Icon name="settings" size={15} />} label="Settings" onClick={() => { close(); p.onSettings(); }} />
         <div className="op-menu-divider" />
         <a className="op-menu-item op-menu-link" href="https://github.com/smithg09/openplan" target="_blank" rel="noreferrer" onClick={close}>
