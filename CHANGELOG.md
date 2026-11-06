@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-06
+
 ### Changed
 
-- **opendocs** — the proxy URL has its own **Proxy** item in the top-bar menu (it moves out of Settings) and is editable in the hosted web app too, where an empty value uses the hosted default
+- **opendocs** — the proxy URL has its own **Proxy** item in the top-bar menu (it moves out of Settings), is also editable from the Profile dialog, and works in the hosted web app too, where an empty value uses the hosted default
 
 ## [0.7.0] - 2026-11-06
 

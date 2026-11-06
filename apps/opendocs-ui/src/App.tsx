@@ -399,7 +399,7 @@ export default function App() {
         {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
       {modal === 'proxy' && <ProxyModal mode={mode} onClose={() => setModal(null)} />}
         {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
-        {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
+        {modal === 'account' && <AccountModal mode={mode} user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
         {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
       </>
     );
@@ -523,7 +523,7 @@ export default function App() {
       {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
       {modal === 'proxy' && <ProxyModal mode={mode} onClose={() => setModal(null)} />}
       {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
-      {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
+      {modal === 'account' && <AccountModal mode={mode} user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
     </div>
   );
 }
