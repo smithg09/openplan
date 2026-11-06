@@ -1,24 +1,17 @@
 import React from 'react';
-import { api } from '../api';
 import { localAuthor, setLocalAuthor } from '../adapt';
 import { applyTheme, savedTheme, type Theme } from '../lib/theme';
 import { Button, DismissButton, Icon, Modal } from './ui';
 
 export const SettingsModal: React.FC<{
-  mode: 'local' | 'proxy';
   onClose: () => void;
   onAuthorChange: (name: string) => void;
   onThemeChange: (t: Theme) => void;
-}> = ({ mode, onClose, onAuthorChange, onThemeChange }) => {
+}> = ({ onClose, onAuthorChange, onThemeChange }) => {
   const [name, setName] = React.useState(localAuthor());
   const [theme, setTheme] = React.useState<Theme>(savedTheme());
-  const [proxy, setProxy] = React.useState('');
   const [saved, setSaved] = React.useState('');
   const [err, setErr] = React.useState('');
-
-  React.useEffect(() => {
-    if (mode === 'local') api.getSettings().then((s) => setProxy(s.proxy)).catch((e) => setErr(String(e.message ?? e)));
-  }, [mode]);
 
   const save = async () => {
     setErr(''); setSaved('');
@@ -26,7 +19,6 @@ export const SettingsModal: React.FC<{
       const n = name.trim() || 'You';
       setLocalAuthor(n); onAuthorChange(n);
       onThemeChange(theme);
-      if (mode === 'local') setProxy((await api.setSettings(proxy.trim())).proxy);
       setSaved('Saved');
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
   };
@@ -56,14 +48,6 @@ export const SettingsModal: React.FC<{
         </div>
         <p className="od-hint">Documents follow this too: the app tells each page whether it is light or dark.</p>
       </div>
-      {mode === 'local' && (
-        <div className="op-settings-section">
-          <h3>Sharing</h3>
-          <label className="od-label">Proxy URL</label>
-          <input className="od-input" placeholder="https://docs.your-team.com — leave empty to stay local" value={proxy} onChange={(e) => setProxy(e.target.value)} />
-          <p className="od-hint">Where <b>Share → Publish</b> uploads documents. Must be https (or http://localhost). <code>opendocs publish</code> uses the same setting.</p>
-        </div>
-      )}
     </Modal>
   );
 };

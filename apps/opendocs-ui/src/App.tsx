@@ -14,6 +14,7 @@ import { AnchoredRail, type RailItem } from './components/AnchoredRail';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { ShareDrawer } from './components/ShareDrawer';
 import { SettingsModal } from './components/SettingsModal';
+import { ProxyModal } from './components/ProxyModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { Icon, SlidePanel, RailHeader } from './components/ui';
 import type { RailFilter } from '@openplan/chrome';
@@ -53,7 +54,7 @@ export default function App() {
   const [newVersion, setNewVersion] = React.useState(false);
   const [filter, setFilter] = React.useState<RailFilter>('all');
   const [railHead, setRailHead] = React.useState(0);
-  const [modal, setModal] = React.useState<'share' | 'settings' | 'history' | 'shortcuts' | 'account' | null>(null);
+  const [modal, setModal] = React.useState<'share' | 'settings' | 'proxy' | 'history' | 'shortcuts' | 'account' | null>(null);
   const [user, setUser] = React.useState<AccountUser | null>(null);
   const refreshUser = React.useCallback(() => { if (accountsEnabled) void currentUser().then(setUser); }, []);
   React.useEffect(refreshUser, [refreshUser]);
@@ -392,10 +393,11 @@ export default function App() {
             } catch (e) { showToast(`Could not open the folder: ${e instanceof Error ? e.message : String(e)}`); }
           }}
           folder={folder} importing={importing} onOpenLocalFile={(path) => void openLocalFile(path)} onCloseFolder={() => setFolder(null)}
-          onSetTheme={setTheme} onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
+          onSetTheme={setTheme} onSettings={() => setModal('settings')} onProxy={() => setModal('proxy')} onShortcuts={() => setModal('shortcuts')}
           onForgot={() => setShared(listShared())}
         />
-        {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+        {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+      {modal === 'proxy' && <ProxyModal mode={mode} onClose={() => setModal(null)} />}
         {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
         {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
         {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
@@ -446,7 +448,7 @@ export default function App() {
         onViewLatest={() => { if (latestId) setCurrentVersionId(latestId); setNewVersion(false); setOrphans(new Set()); }}
         onSetTheme={setTheme} onExportMd={exportMd} onExportJson={exportJson} onDownloadHtml={() => void downloadHtml()}
         onPrint={() => postToFrame({ type: 'opendocs:print' })} onUploadVersion={() => uploadRef.current?.click()}
-        onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
+        onSettings={() => setModal('settings')} onProxy={() => setModal('proxy')} onShortcuts={() => setModal('shortcuts')}
         onHome={mode === 'local' || WEB ? () => void goHome() : undefined}
         account={accountsEnabled ? { user, onOpen: () => setModal('account') } : undefined}
       />
@@ -517,8 +519,9 @@ export default function App() {
           onOpen={(id) => { setCurrentVersionId(id); setOrphans(new Set()); if (id === latestId) setNewVersion(false); }}
           onRestore={restore} onClose={() => setModal(null)} />
       )}
-      {modal === 'share' && <ShareDrawer mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('settings')} />}
-      {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+      {modal === 'share' && <ShareDrawer mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('proxy')} />}
+      {modal === 'settings' && <SettingsModal onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
+      {modal === 'proxy' && <ProxyModal mode={mode} onClose={() => setModal(null)} />}
       {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
       {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
     </div>
