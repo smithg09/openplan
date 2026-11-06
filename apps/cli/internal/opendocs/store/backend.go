@@ -1,5 +1,11 @@
 package store
 
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
+
 // DocStore is the per-document persistence contract the server depends on. The
 // filesystem store implements it; so can a SQL store. Every implementation must
 // pass the shared contract suite in the storetest package, and must return the
@@ -45,3 +51,22 @@ func (s *Store) Backend() Backend { return fsBackend{s} }
 func (b fsBackend) Doc(project, doc string) DocStore { return b.s.Doc(project, doc) }
 
 func (b fsBackend) ListDocs(project string) ([]string, error) { return b.s.ListDocs(project) }
+
+// DocDeleter is implemented by backends that can remove a whole document
+// (the local filesystem store; the proxy's databases do not offer it).
+type DocDeleter interface {
+	DeleteDoc(project, doc string) error
+}
+
+// DeleteDoc removes a document with all its versions and comments. doc must be a
+// plain name: it is joined into a path.
+func (b fsBackend) DeleteDoc(project, doc string) error {
+	if doc == "" || doc == "." || doc == ".." || strings.ContainsAny(doc, `/\`) || strings.ContainsAny(project, `/\`) || project == ".." {
+		return ErrNotFound
+	}
+	dir := filepath.Join(b.s.baseDir, project, doc)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return ErrNotFound
+	}
+	return os.RemoveAll(dir)
+}

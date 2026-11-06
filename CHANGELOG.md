@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The **opendocs skill is bundled in the Claude Code plugin** (`/plugin install openplan@openplan` now gives both products), and `install.sh opendocs` installs the skill automatically when Claude Code is detected
 - `DEPLOY.md`: step-by-step deployment of the site, web app, backend and database on free tiers (Cloudflare Pages + Render + Neon)
 - opendocs landing: three-line hero, an "Open the app" button, new Self-host and App sections, and an opendocs banner on the openplan landing page
-- **Documents home** in the web app and the local server: search every word, continue documents on this device, and reopen links you opened before
+- **Documents home** in the web app and the local server: centered layout with an animated background, search every word, card or list view, upload an HTML file, open a folder, delete documents, collapsible examples, and reopen links you opened before
 - Publishing now **shares existing comments** along with the document, and links for the hosted proxy open on `opendocs.smithgajjar.dev/app` instead of the backend's host
 
 ### Fixed

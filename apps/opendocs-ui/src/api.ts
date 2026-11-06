@@ -167,6 +167,7 @@ export const httpApi = {
   },
   sample: () => req<{ slug: string; html: string }>('GET', '/api/sample'),
   listDocs: () => req<{ docs: string[] | null }>('GET', '/api/docs'),
+  deleteDoc: (doc: string) => req<{ ok: boolean }>('DELETE', `/api/docs/${encodeURIComponent(doc)}`),
   search: (q: string) => req<{ results: SearchHit[] | null }>('GET', `/api/search?q=${encodeURIComponent(q)}`),
   listVersions: (doc: string) =>
     req<{ versions: ApiVersion[] | null }>('GET', `/api/docs/${encodeURIComponent(doc)}/versions`),

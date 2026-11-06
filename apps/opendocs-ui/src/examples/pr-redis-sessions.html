@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR #482: Move sessions to Redis</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1c1c1e; --muted:#6b6b72; --line:#e4e4e7; --accent:#2563eb; --warn:#c2410c; --ok:#15803d; --panel:#f3f3f1; }
+  html[data-theme="dark"] { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; }
+  @media (prefers-color-scheme: dark) { html:not([data-theme]) { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 700px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow { font:600 11px/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 12px; }
+  h2 { font-size: 20px; letter-spacing: -.01em; margin: 40px 0 10px; }
+  p { margin: 0 0 14px; } .lede { font-size: 18px; color: var(--muted); }
+  table { width:100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 16px; }
+  th, td { text-align:left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px/1 ui-monospace, monospace; letter-spacing:.08em; text-transform: uppercase; color: var(--muted); }
+  pre { margin:0; padding: 14px 16px; background: var(--panel); border-radius: 10px; overflow:auto; font: 13px/1.6 ui-monospace, Menlo, monospace; }
+  .panel { background: var(--panel); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
+  .tag { display:inline-block; font: 600 11px/1 ui-monospace, monospace; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  ul.check { list-style:none; padding:0; margin: 8px 0 0; }
+  ul.check li { display:flex; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  ul.check i { flex:none; width:18px; height:18px; margin-top:4px; border-radius:5px; border:1.5px solid var(--muted); display:grid; place-items:center; font-style:normal; font-size:12px; color:transparent; }
+  ul.check li.done i { background: var(--ok); border-color: var(--ok); color:#fff; }
+  ul.check li.done span { color: var(--muted); text-decoration: line-through; }
+  .bar { height: 10px; border-radius: 5px; background: var(--line); overflow:hidden; } .bar > div { height:100%; background: var(--accent); transition: width .25s; }
+  .seg { display:flex; gap:4px; margin: 10px 0 14px; } .seg button { font: inherit; font-size: 13px; color: var(--muted); background: var(--panel); border:0; padding: 6px 12px; border-radius: 8px; cursor:pointer; }
+  .seg button[aria-pressed=true] { color: var(--fg); outline: 1.5px solid var(--accent); }
+  .add { color: var(--ok); } .del { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Pull request · auth-service</div>
+<h1>PR #482: Move sessions to Redis</h1>
+<p class="lede">Sessions move from the primary database to Redis with a 30 minute sliding expiry. Login latency drops, and the sessions table stops being the largest write source.</p>
+<h2>What changed</h2>
+<pre><span class="del">- INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)</span>
+<span class="add">+ SET session:{id} {user_id} EX 1800</span>
+
+<span class="del">- UPDATE sessions SET expires_at = now() + interval '30 min' WHERE id = $1</span>
+<span class="add">+ EXPIRE session:{id} 1800</span></pre>
+<h2>Why now</h2>
+<p>Session reads are 41% of primary read traffic and each request writes the row to extend it. Redis handles both without touching the database.</p>
+<h2>Risk</h2>
+<table><tr><th>Risk</th><th>Mitigation</th></tr>
+<tr><td>Redis restart logs everyone out</td><td>Replicated, with AOF persistence on</td></tr>
+<tr><td>Dual-write window during rollout</td><td>Read Redis first, fall back to the table for 7 days</td></tr></table>
+<h2>Rollout checklist</h2>
+<div class="bar"><div id="prog"></div></div><p style="font-size:13px;color:var(--muted);margin-top:6px"><span id="count"></span> done</p>
+<ul class="check"><li><i>✓</i><span>Deploy dual-write behind the flag</span></li><li><i>✓</i><span>Backfill active sessions</span></li><li><i>✓</i><span>Flip reads to Redis for 5% of users</span></li><li><i>✓</i><span>Watch error rate for 24 hours</span></li><li><i>✓</i><span>Drop the sessions table</span></li></ul>
+</main>
+<script>
+  document.querySelectorAll('ul.check li').forEach(function (li) { li.addEventListener('click', function () { li.classList.toggle('done'); update(); }); });
+  function update() { var all = document.querySelectorAll('ul.check li'), done = document.querySelectorAll('ul.check li.done'); var b = document.getElementById('prog'); if (b) b.style.width = (all.length ? 100 * done.length / all.length : 0) + '%'; var c = document.getElementById('count'); if (c) c.textContent = done.length + ' of ' + all.length; }
+  update();
+</script>
+</body>
+</html>
