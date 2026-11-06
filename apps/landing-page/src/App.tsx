@@ -5,6 +5,7 @@ import TrustStrip from './components/TrustStrip';
 import DemoSection from './components/DemoSection';
 import GifSection from './components/GifSection';
 import FeaturesSection from './components/FeaturesSection';
+import OpendocsBanner from './components/OpendocsBanner';
 import Footer from './components/Footer';
 import PageAnnotator from './components/PageAnnotator';
 
@@ -25,6 +26,7 @@ export default function App() {
       <DemoSection />
       <GifSection />
       <FeaturesSection />
+      <OpendocsBanner />
       <Footer />
     </PageAnnotator>
   );

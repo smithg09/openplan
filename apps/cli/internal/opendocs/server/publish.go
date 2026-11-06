@@ -126,12 +126,17 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 	if published {
 		pub = prev
 		v, err := c.PublishVersion(prev.ID, prev.EditorToken, string(content), head.Label, req.Summary)
-		if err != nil {
+		switch {
+		case err == nil:
+			resp["id"], resp["new"], resp["versionId"] = prev.ID, false, v.ID
+		case remote.IsGone(err):
+			published = false // the proxy lost this document (e.g. its storage was reset): publish it afresh
+		default:
 			writeErr(w, http.StatusBadGateway, err)
 			return
 		}
-		resp["id"], resp["new"], resp["versionId"] = prev.ID, false, v.ID
-	} else {
+	}
+	if !published {
 		created, err := c.CreateDoc(string(content), head.Label, req.Summary)
 		if err != nil {
 			writeErr(w, http.StatusBadGateway, err)
@@ -238,6 +243,10 @@ func (s *Server) handleRemoteLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token, err := c.MintShare(p.ID, p.EditorToken, role.String(), req.Label)
+	if remote.IsGone(err) {
+		writeErr(w, http.StatusConflict, errors.New("this document is no longer on the proxy — click “Publish latest version” to publish it again"))
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusBadGateway, err)
 		return

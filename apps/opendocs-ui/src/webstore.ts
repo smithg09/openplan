@@ -77,6 +77,9 @@ async function seedSampleOnce() {
 // ── sharing: browser → proxy, over CORS ─────────────────────────────────────
 interface Published { proxy: string; id: string; editorToken: string; comments?: Record<string, string> }
 
+class ProxyError extends Error { constructor(msg: string, readonly status: number) { super(msg); } }
+const gone = (e: unknown) => e instanceof ProxyError && (e.status === 401 || e.status === 404);
+
 async function proxyCall<T>(base: string, method: string, path: string, token: string | null, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') headers['Content-Type'] = 'application/json';
@@ -90,7 +93,7 @@ async function proxyCall<T>(base: string, method: string, path: string, token: s
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
     try { const j = await res.json(); if (j?.error) msg = j.error; } catch { /* ignore */ }
-    throw new Error(msg);
+    throw new ProxyError(msg, res.status);
   }
   return res.json() as Promise<T>;
 }
@@ -210,8 +213,12 @@ export const webLocalApi: Api = {
     const proxy = normalizeProxy(proxyArg?.trim() || (await configuredProxy()));
     const prev = await meta<Published>(`published:${doc}`);
     if (prev && prev.proxy === proxy) {
-      await proxyCall(proxy, 'POST', `/api/docs/${encodeURIComponent(prev.id)}/versions`, prev.editorToken, { html: head.html, label: head.label ?? '', summary: '' });
-      return { id: prev.id, proxy, new: false, ...(await syncComments(doc, prev)) };
+      try {
+        await proxyCall(proxy, 'POST', `/api/docs/${encodeURIComponent(prev.id)}/versions`, prev.editorToken, { html: head.html, label: head.label ?? '', summary: '' });
+        return { id: prev.id, proxy, new: false, ...(await syncComments(doc, prev)) };
+      } catch (e) {
+        if (!gone(e)) throw e; // otherwise the proxy lost this document (e.g. its storage was reset): publish afresh below
+      }
     }
     const created = await proxyCall<{ id: string; editorToken: string }>(proxy, 'POST', '/api/docs', null, { html: head.html, label: head.label ?? '', summary: '' });
     // The editor token is kept in this browser's storage (there is no server to hold it).
@@ -222,7 +229,13 @@ export const webLocalApi: Api = {
   remoteLink: async (doc, role) => {
     const p = await meta<Published>(`published:${doc}`);
     if (!p) throw new Error('publish this document first');
-    const r = await proxyCall<{ token: string }>(p.proxy, 'POST', `/api/docs/${encodeURIComponent(p.id)}/shares`, p.editorToken, { role, label: `${role} link` });
+    let r: { token: string };
+    try {
+      r = await proxyCall<{ token: string }>(p.proxy, 'POST', `/api/docs/${encodeURIComponent(p.id)}/shares`, p.editorToken, { role, label: `${role} link` });
+    } catch (e) {
+      if (gone(e)) throw new Error('This document is no longer on the proxy — click “Publish latest version” to publish it again.');
+      throw e;
+    }
     return { link: capabilityLink(p.proxy, p.id, r.token), role };
   },
   listShares: async () => ({ shares: [] }),
