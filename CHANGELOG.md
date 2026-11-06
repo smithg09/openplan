@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **opendocs landing page** with a working review demo built on the real review engine, and a product switcher between openplan and opendocs on both marketing sites; the page is annotatable like openplan's
 - The **opendocs skill is bundled in the Claude Code plugin** (`/plugin install openplan@openplan` now gives both products), and `install.sh opendocs` installs the skill automatically when Claude Code is detected
 - `DEPLOY.md`: step-by-step deployment of the site, web app, backend and database on free tiers (Cloudflare Pages + Render + Neon)
+- **Documents home** in the web app and the local server: search every word, continue documents on this device, and reopen links you opened before
+- Publishing now **shares existing comments** along with the document, and links for the hosted proxy open on `opendocs.smithgajjar.dev/app` instead of the backend's host
+
+### Fixed
+
+- Clicking a comment card could crash the page ("Maximum update depth exceeded")
+- Reaction comments showed no emoji in the panel
+- Highlights no longer pick up a document's own `span` styles (they were rendered as a custom element), and deletion highlights keep their underline
+- `/app/d/<id>` links now route to the web app on Cloudflare Pages
 - Floating **reaction picker** in comment cards, and an **All / Open / Resolved** filter in the comments panel (also in openplan)
 
 ### Changed

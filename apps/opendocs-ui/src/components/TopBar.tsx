@@ -33,6 +33,8 @@ export interface TopBarProps {
   onUploadVersion: () => void;
   onSettings: () => void;
   onShortcuts: () => void;
+  /** Back to the documents home (absent when there is none, e.g. a proxy's own UI). */
+  onHome?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = (p) => (
@@ -40,9 +42,16 @@ export const TopBar: React.FC<TopBarProps> = (p) => (
     brand="opendocs"
     brandHref="https://opendocs.smithgajjar.dev"
     leading={
-      <button className={`op-btn op-btn-ghost op-btn-md op-btn-icon-only${p.leftOpen ? ' is-active' : ''}`} title="Toggle files and outline  [" aria-label="Toggle files and outline" onClick={p.onToggleLeft}>
-        <Icon name="panel_left" size={16} />
-      </button>
+      <>
+        <button className={`op-btn op-btn-ghost op-btn-md op-btn-icon-only${p.leftOpen ? ' is-active' : ''}`} title="Toggle files and outline  [" aria-label="Toggle files and outline" onClick={p.onToggleLeft}>
+          <Icon name="panel_left" size={16} />
+        </button>
+        {p.onHome && (
+          <button className="op-btn op-btn-ghost op-btn-md op-btn-icon-only" title="All documents" aria-label="All documents" onClick={p.onHome}>
+            <Icon name="arrow_back" size={16} />
+          </button>
+        )}
+      </>
     }
     title={p.title}
     chip={

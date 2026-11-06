@@ -1,5 +1,6 @@
 import React from 'react';
 import { api, shareOrigin, type ApiShare, type Role } from '../api';
+import { capabilityLink } from '../env';
 import { Button, CopyButton, Drawer, Icon, useDismiss } from './ui';
 
 const ROLE_HELP: Record<Role, string> = {
@@ -34,7 +35,7 @@ function ProxyShare({ doc, origin }: { doc: string; origin: string }) {
     setBusy(true); setErr('');
     try {
       const r = await api.mintShare(doc, role, label.trim());
-      setFresh({ link: `${origin}/d/${encodeURIComponent(doc)}#t=${encodeURIComponent(r.token)}`, role });
+      setFresh({ link: capabilityLink(origin, doc, r.token), role });
       setLabel('');
       await load();
     } catch (e) { setErr(errMsg(e)); } finally { setBusy(false); }
@@ -94,7 +95,8 @@ function LocalShare({ doc, onOpenSettings }: { doc: string; onOpenSettings: () =
     setBusy(true); setErr(''); setNote('');
     try {
       const r = await api.publish(doc, proxy.trim() || undefined);
-      setNote(r.new ? 'Published. Copy a link below to share it.' : 'Published the latest version to the same document.');
+      const sent = r.comments ? ` ${r.comments} comment${r.comments === 1 ? '' : 's'} shared.` : '';
+      setNote((r.new ? 'Published. Copy a link below to share it.' : 'Published the latest version to the same document.') + sent + (r.commentsError ? ` Comments could not be shared: ${r.commentsError}` : ''));
       await load();
     } catch (e) { setErr(errMsg(e)); } finally { setBusy(false); }
   };
