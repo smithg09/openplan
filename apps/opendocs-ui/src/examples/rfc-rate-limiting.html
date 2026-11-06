@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RFC: Rate limiting for the public API</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1c1c1e; --muted:#6b6b72; --line:#e4e4e7; --accent:#2563eb; --warn:#c2410c; --ok:#15803d; --panel:#f3f3f1; }
+  html[data-theme="dark"] { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; }
+  @media (prefers-color-scheme: dark) { html:not([data-theme]) { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 700px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow { font:600 11px/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 12px; }
+  h2 { font-size: 20px; letter-spacing: -.01em; margin: 40px 0 10px; }
+  p { margin: 0 0 14px; } .lede { font-size: 18px; color: var(--muted); }
+  table { width:100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 16px; }
+  th, td { text-align:left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px/1 ui-monospace, monospace; letter-spacing:.08em; text-transform: uppercase; color: var(--muted); }
+  pre { margin:0; padding: 14px 16px; background: var(--panel); border-radius: 10px; overflow:auto; font: 13px/1.6 ui-monospace, Menlo, monospace; }
+  .panel { background: var(--panel); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
+  .tag { display:inline-block; font: 600 11px/1 ui-monospace, monospace; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  ul.check { list-style:none; padding:0; margin: 8px 0 0; }
+  ul.check li { display:flex; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  ul.check i { flex:none; width:18px; height:18px; margin-top:4px; border-radius:5px; border:1.5px solid var(--muted); display:grid; place-items:center; font-style:normal; font-size:12px; color:transparent; }
+  ul.check li.done i { background: var(--ok); border-color: var(--ok); color:#fff; }
+  ul.check li.done span { color: var(--muted); text-decoration: line-through; }
+  .bar { height: 10px; border-radius: 5px; background: var(--line); overflow:hidden; } .bar > div { height:100%; background: var(--accent); transition: width .25s; }
+  .seg { display:flex; gap:4px; margin: 10px 0 14px; } .seg button { font: inherit; font-size: 13px; color: var(--muted); background: var(--panel); border:0; padding: 6px 12px; border-radius: 8px; cursor:pointer; }
+  .seg button[aria-pressed=true] { color: var(--fg); outline: 1.5px solid var(--accent); }
+  .add { color: var(--ok); } .del { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">RFC · Platform</div>
+<h1>RFC: Rate limiting for the public API</h1>
+<p class="lede">A single noisy integration took the API down twice last quarter. This proposes per-key limits, enforced at the gateway, with a clear path for customers who need more.</p>
+<h2>Problem</h2>
+<p>Today the only protection is a global concurrency cap. One customer retrying aggressively consumes the whole pool, and every other customer sees 503s. We cannot tell customers what they are allowed to do, so support tickets turn into guesses.</p>
+<h2>Options considered</h2>
+<table><tr><th>Option</th><th>Accuracy</th><th>Cost</th><th>Verdict</th></tr>
+<tr><td>Fixed window per key</td><td>Bursty at window edges</td><td>One counter</td><td>Rejected</td></tr>
+<tr><td>Sliding window log</td><td>Exact</td><td>Memory grows with traffic</td><td>Rejected</td></tr>
+<tr><td>Token bucket per key</td><td>Smooth, allows bursts</td><td>Two numbers per key</td><td><span class="tag">Proposed</span></td></tr></table>
+<h2>Proposal</h2>
+<p>Each API key gets a token bucket: a steady refill rate and a burst size. Limits live in the gateway; the service behind it is unchanged. Rejected requests return <code>429</code> with a <code>Retry-After</code> header.</p>
+<div class="seg" role="group" aria-label="Plan"><button aria-pressed="true" data-p="60,120">Free</button><button aria-pressed="false" data-p="600,1200">Team</button><button aria-pressed="false" data-p="6000,12000">Scale</button></div>
+<div class="panel"><b id="rate">60 requests / minute</b><br><span id="burst" style="color:var(--muted)">bursts up to 120</span></div>
+<pre>HTTP/1.1 429 Too Many Requests
+Retry-After: 4
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0</pre>
+<h2>Open questions</h2>
+<ul><li>Should limits apply per key or per organisation?</li><li>Do webhooks count against the bucket?</li><li>How long do we announce the change before enforcing it?</li></ul>
+</main>
+<script>
+  document.querySelectorAll('.seg button').forEach(function (b) { b.addEventListener('click', function () {
+    document.querySelectorAll('.seg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    var p = b.dataset.p.split(','); document.getElementById('rate').textContent = p[0] + ' requests / minute'; document.getElementById('burst').textContent = 'bursts up to ' + p[1];
+  }); });
+</script>
+</body>
+</html>

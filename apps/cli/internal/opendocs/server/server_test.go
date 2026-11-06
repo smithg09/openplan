@@ -373,3 +373,21 @@ func TestSampleEndpoint(t *testing.T) {
 		t.Fatalf("sample = %d %.80s", w.Code, w.Body)
 	}
 }
+
+func TestDeleteLocalDocument(t *testing.T) {
+	s, doc := newTestServer(t)
+	doc.CreateVersion([]byte("<p>x</p>"), "", "v1", "")
+	h := s.Handler()
+	if w := do(t, h, "DELETE", "/api/docs/report", nil); w.Code != 200 {
+		t.Fatalf("delete = %d %s", w.Code, w.Body)
+	}
+	if w := do(t, h, "GET", "/api/docs", nil); strings.Contains(w.Body.String(), "report") {
+		t.Errorf("document still listed: %s", w.Body)
+	}
+	if w := do(t, h, "DELETE", "/api/docs/report", nil); w.Code != 404 {
+		t.Errorf("second delete = %d, want 404", w.Code)
+	}
+	if w := do(t, h, "DELETE", "/api/docs/..", nil); w.Code == 200 {
+		t.Errorf("path traversal accepted")
+	}
+}

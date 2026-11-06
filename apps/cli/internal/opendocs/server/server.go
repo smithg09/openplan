@@ -86,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("DELETE /api/docs/{doc}/shares/{id}", s.guard(auth.ActWrite, s.handleRevokeShare))
 	} else {
 		mux.HandleFunc("GET /api/docs", s.handleListDocs)
+		mux.HandleFunc("DELETE /api/docs/{doc}", s.handleDeleteDoc)
 		mux.HandleFunc("GET /api/search", s.handleSearch)
 		mux.HandleFunc("GET /api/sample", s.handleSample)
 		mux.HandleFunc("GET /api/settings", s.handleGetSettings)
@@ -232,6 +233,31 @@ func (s *Server) handleListDocs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"docs": docs})
+}
+
+// handleDeleteDoc removes a local document (local mode only: a proxy's documents
+// are managed through their links).
+func (s *Server) handleDeleteDoc(w http.ResponseWriter, r *http.Request) {
+	doc := r.PathValue("doc")
+	del, ok := s.store.(store.DocDeleter)
+	if !ok {
+		writeErr(w, http.StatusNotImplemented, errors.New("this backend cannot delete documents"))
+		return
+	}
+	if !validDocID(doc) {
+		writeErr(w, http.StatusBadRequest, errors.New("invalid document id"))
+		return
+	}
+	err := del.DeleteDoc(s.project, doc)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, http.StatusNotFound, err)
+		return
+	}
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 // handleSample serves the bundled interactive sample document (local mode) so

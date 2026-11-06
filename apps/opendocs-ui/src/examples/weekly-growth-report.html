@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth report: week 44</title>
+<style>
+  :root { --bg:#fbfbfa; --fg:#1c1c1e; --muted:#6b6b72; --line:#e4e4e7; --accent:#2563eb; --warn:#c2410c; --ok:#15803d; --panel:#f3f3f1; }
+  html[data-theme="dark"] { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; }
+  @media (prefers-color-scheme: dark) { html:not([data-theme]) { --bg:#111113; --fg:#ececee; --muted:#9a9aa3; --line:#2a2a2f; --accent:#6aa2ff; --warn:#fb923c; --ok:#4ade80; --panel:#18181b; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.7 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 700px; margin: 0 auto; padding: 56px 24px 96px; }
+  .eyebrow { font:600 11px/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 14px 0 12px; }
+  h2 { font-size: 20px; letter-spacing: -.01em; margin: 40px 0 10px; }
+  p { margin: 0 0 14px; } .lede { font-size: 18px; color: var(--muted); }
+  table { width:100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 16px; }
+  th, td { text-align:left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 600 11px/1 ui-monospace, monospace; letter-spacing:.08em; text-transform: uppercase; color: var(--muted); }
+  pre { margin:0; padding: 14px 16px; background: var(--panel); border-radius: 10px; overflow:auto; font: 13px/1.6 ui-monospace, Menlo, monospace; }
+  .panel { background: var(--panel); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
+  .tag { display:inline-block; font: 600 11px/1 ui-monospace, monospace; padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  ul.check { list-style:none; padding:0; margin: 8px 0 0; }
+  ul.check li { display:flex; gap:12px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  ul.check i { flex:none; width:18px; height:18px; margin-top:4px; border-radius:5px; border:1.5px solid var(--muted); display:grid; place-items:center; font-style:normal; font-size:12px; color:transparent; }
+  ul.check li.done i { background: var(--ok); border-color: var(--ok); color:#fff; }
+  ul.check li.done span { color: var(--muted); text-decoration: line-through; }
+  .bar { height: 10px; border-radius: 5px; background: var(--line); overflow:hidden; } .bar > div { height:100%; background: var(--accent); transition: width .25s; }
+  .seg { display:flex; gap:4px; margin: 10px 0 14px; } .seg button { font: inherit; font-size: 13px; color: var(--muted); background: var(--panel); border:0; padding: 6px 12px; border-radius: 8px; cursor:pointer; }
+  .seg button[aria-pressed=true] { color: var(--fg); outline: 1.5px solid var(--accent); }
+  .add { color: var(--ok); } .del { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">Weekly report · Growth</div>
+<h1>Growth report: week 44</h1>
+<p class="lede">Signups were up, but activation slipped. The new onboarding checklist is the likely cause, and we want a second pair of eyes before we change it.</p>
+<h2>This week</h2>
+<table><tr><th>Metric</th><th>Week 43</th><th>Week 44</th></tr><tr><td>Signups</td><td>1,820</td><td>2,140</td></tr><tr><td>Activated within 7 days</td><td>38%</td><td>31%</td></tr><tr><td>Paid conversions</td><td>96</td><td>88</td></tr></table>
+<h2>Signups by channel</h2>
+<div class="seg" role="group"><button aria-pressed="true" data-v="320,540,780,500">Organic</button><button aria-pressed="false" data-v="120,210,260,180">Paid</button><button aria-pressed="false" data-v="60,90,140,110">Referral</button></div>
+<svg viewBox="0 0 400 130" width="100%" role="img" aria-label="Signups by week"><g id="bars"></g></svg>
+<h2>What we think happened</h2>
+<p>The checklist added three steps before first value. Users who finished it activated at the same rate as before, but fewer finished it. We propose moving the invite step after the first project is created.</p>
+<h2>Decision needed</h2>
+<p>Ship the reorder to half of new signups next week and compare activation after seven days.</p>
+</main>
+<script>
+  var weeks = ['W41','W42','W43','W44'];
+  function draw(v) { var max = Math.max.apply(null, v), g = document.getElementById('bars'); g.innerHTML = '';
+    v.forEach(function (n, i) { var h = 100 * n / max, x = 20 + i * 95;
+      g.insertAdjacentHTML('beforeend', '<rect x="' + x + '" y="' + (110 - h) + '" width="60" height="' + h + '" rx="6" fill="var(--accent)" opacity="' + (i === 3 ? 1 : .45) + '"/><text x="' + (x + 30) + '" y="126" text-anchor="middle" font-size="11" fill="var(--muted)">' + weeks[i] + '</text><text x="' + (x + 30) + '" y="' + (104 - h) + '" text-anchor="middle" font-size="11" fill="var(--fg)">' + n + '</text>'); }); }
+  document.querySelectorAll('.seg button').forEach(function (b) { b.addEventListener('click', function () {
+    document.querySelectorAll('.seg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    draw(b.dataset.v.split(',').map(Number)); }); });
+  draw([320,540,780,500]);
+</script>
+</body>
+</html>

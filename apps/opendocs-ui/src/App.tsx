@@ -4,6 +4,7 @@ import { api, bootstrap, captureToken, currentApiBase, currentToken, docFromPath
 import { buildThreads, threadToAnnotation, localAuthor } from './adapt';
 import { TopBar } from './components/TopBar';
 import { Home } from './components/Home';
+import { type Example } from './examples';
 import { WEB } from './env';
 import { listShared, rememberShared, type SharedDoc } from './lib/recent';
 import { LeftPanel, type Heading } from './components/LeftPanel';
@@ -321,6 +322,27 @@ export default function App() {
     } catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
   };
 
+  const openExample = async (ex: Example) => {
+    try {
+      await importHtml(ex.slug, ex.html, ex.title);
+      setDocs((await api.listDocs()).docs ?? []);
+      if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(ex.slug)}`);
+      await openDoc(ex.slug);
+    } catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
+  };
+
+  // An HTML file chosen on the home page becomes its own document and opens for review.
+  const uploadAsDoc = async (file: File) => {
+    try {
+      const html = await file.text();
+      const base = slugify(file.name.replace(/\.html?$/i, '')) || 'document';
+      await importHtml(base, html, file.name);
+      setDocs((await api.listDocs()).docs ?? []);
+      if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(base)}`);
+      await openDoc(base);
+    } catch (e) { showToast(e instanceof Error ? e.message : String(e)); }
+  };
+
   const exportMd = () => download(`${docSlug}-comments.md`, commentsToMarkdown(title, comments), 'text/markdown');
   const exportJson = () => download(`${docSlug}-comments.json`, commentsToJSON(comments), 'application/json');
   const downloadHtml = async () => {
@@ -354,8 +376,16 @@ export default function App() {
         <Home
           docs={docs} shared={shared} fsSupported={fsAccessSupported()} author={author} theme={theme}
           onOpen={(slug) => { if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(slug)}`); void openDoc(slug); }}
-          onOpenSample={() => void openSample()}
-          onPickFolder={async () => { try { const f = await pickFolder(); if (f) { setFolder(f); setDocSlug(''); setView('doc'); } } catch (e) { showToast(e instanceof Error ? e.message : String(e)); } }}
+          onOpenExample={(ex) => void openExample(ex)}
+          onUpload={(f) => void uploadAsDoc(f)}
+          onDelete={async (slug) => { await api.deleteDoc(slug); setDocs((await api.listDocs()).docs ?? []); }}
+          onPickFolder={async () => {
+            try {
+              const f = await pickFolder();
+              if (f) { setFolder(f); showToast(f.files.length ? `Found ${f.files.length} HTML file${f.files.length === 1 ? '' : 's'} in “${f.name}”` : `No HTML files found in “${f.name}”`); }
+            } catch (e) { showToast(`Could not open the folder: ${e instanceof Error ? e.message : String(e)}`); }
+          }}
+          folder={folder} importing={importing} onOpenLocalFile={(path) => void openLocalFile(path)} onCloseFolder={() => setFolder(null)}
           onSetTheme={setTheme} onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
           onForgot={() => setShared(listShared())}
         />

@@ -140,6 +140,13 @@ export const webLocalApi: Api = {
     const all = await done<{ slug: string }[]>((await store('docs')).getAll() as IDBRequest<{ slug: string }[]>);
     return { docs: all.map((d) => d.slug).sort() };
   },
+  deleteDoc: async (doc) => {
+    for (const v of await versionsOf(doc)) await del('versions', v.key);
+    for (const c of await getAll<CommentRow>('comments', doc)) await del('comments', c.key);
+    await del('docs', doc);
+    await del('meta', `published:${doc}`);
+    return { ok: true };
+  },
   search: async (q) => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
     const results: SearchHit[] = [];
