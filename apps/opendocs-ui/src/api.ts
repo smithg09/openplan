@@ -1,4 +1,5 @@
 import { DEFAULT_PROXY, WEB } from './env';
+import { USER_HEADER, accountsEnabled, userToken } from './account';
 
 // Typed client for the opendocs local server. Types mirror the Go JSON exactly
 // (note the anchor uses start/end, not the shared type's startOffset/endOffset);
@@ -94,11 +95,33 @@ export function setApiBase(base: string): void { apiBase = base.replace(/\/$/, '
 /** Where the current page's API lives, for remembering a shared document. */
 export function currentApiBase(): string { return apiBase; }
 export function currentToken(): string { return activeToken; }
+/** The signed-in user's own published documents on a proxy (newest first). */
+export async function accountDocs(proxy: string): Promise<{ id: string; createdAt: string }[]> {
+  const headers: Record<string, string> = {};
+  await addUserTo(headers);
+  if (!headers[USER_HEADER]) return [];
+  const res = await fetch(`${proxy}/api/me/docs`, { headers });
+  if (!res.ok) throw new Error(`could not load your documents (${res.status})`);
+  return ((await res.json()) as { docs: { id: string; createdAt: string }[] | null }).docs ?? [];
+}
+async function addUserTo(headers: Record<string, string>): Promise<void> {
+  if (!accountsEnabled) return;
+  const t = await userToken();
+  if (t) headers[USER_HEADER] = t;
+}
+
 export function shareOrigin(): string { return apiBase || window.location.origin; }
 const resolve = (p: string) => apiBase + p;
 
 let httpMode: 'local' | 'proxy' = 'local';
 let liveEnabled = true;
+
+/** Signed-in users identify themselves to a proxy with their account token (never to the local server). */
+async function addUser(headers: Record<string, string>): Promise<void> {
+  if (!accountsEnabled || !(apiBase || httpMode === 'proxy')) return;
+  const t = await userToken();
+  if (t) headers[USER_HEADER] = t;
+}
 
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   // The server rejects any write that isn't application/json (this forces a CORS
@@ -107,6 +130,7 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
   if (method !== 'GET') headers['Content-Type'] = 'application/json';
   if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+  await addUser(headers);
   const res = await fetch(resolve(url), {
     method,
     headers,
@@ -204,6 +228,7 @@ export async function subscribe(doc: string, onEvent: (e: LiveEvent) => void, si
     try {
       const headers: Record<string, string> = { Accept: 'text/event-stream' };
       if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
+      await addUser(headers);
       const res = await fetch(resolve(`/api/docs/${encodeURIComponent(doc)}/events`), { headers, signal });
       if (res.status === 401 || res.status === 403) return; // not allowed: don't retry
       if (!res.ok || !res.body) throw new Error(String(res.status));

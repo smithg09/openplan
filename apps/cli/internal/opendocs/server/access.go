@@ -30,7 +30,14 @@ const frameTTL = 5 * time.Minute
 // principal is who a request acts as on one document.
 type principal struct {
 	role auth.Role
-	hash string // token hash; "" for the local single-user server
+	hash string // comment-ownership key: "user:<sub>" when signed in, else the token hash; "" for the local server
+	alt  string // the capability token's hash, when it differs from hash (comments written before signing in)
+	user *auth.User
+}
+
+// owns reports whether a comment's recorded owner is this caller.
+func (p principal) owns(owner string) bool {
+	return owner != "" && (owner == p.hash || owner == p.alt)
 }
 
 // tenant reports whether the principal came from a capability token.
@@ -52,11 +59,45 @@ func (s *Server) principalFor(r *http.Request, doc string) (principal, bool) {
 	if !s.multiTenant() {
 		return principal{role: auth.RoleEditor}, true
 	}
-	g, ok := s.grants.Lookup(doc, auth.BearerToken(r.Header.Get("Authorization")))
-	if !ok {
+	user := s.userFrom(r)
+	g, linked := s.grants.Lookup(doc, auth.BearerToken(r.Header.Get("Authorization")))
+	owned := user != nil && s.owners != nil && s.owners.Owns(user.Sub, doc)
+	if !linked && !owned {
 		return principal{}, false
 	}
-	return principal{role: g.Role, hash: g.TokenHash}, true
+	p := principal{role: g.Role, hash: g.TokenHash, user: user}
+	if owned {
+		p.role = auth.RoleEditor // the account that published a document can always edit it
+	}
+	if user != nil {
+		p.alt, p.hash = p.hash, "user:"+user.Sub
+	}
+	return p, true
+}
+
+// userHeader carries the signed-in user's token. It is separate from
+// Authorization, which holds the capability link, because a signed-in person
+// opening a shared link presents both.
+const userHeader = "X-Opendocs-User"
+
+// WithAccounts enables optional sign-in: tokens from v identify users, and owners
+// records which documents each user published.
+func (s *Server) WithAccounts(v *auth.JWTVerifier, o auth.Owners) *Server {
+	s.users, s.owners = v, o
+	return s
+}
+
+// userFrom returns the verified user behind r, or nil (anonymous, an invalid
+// token, or accounts not enabled).
+func (s *Server) userFrom(r *http.Request) *auth.User {
+	if s.users == nil {
+		return nil
+	}
+	u, err := s.users.Verify(r.Header.Get(userHeader), time.Now())
+	if err != nil {
+		return nil
+	}
+	return &u
 }
 
 type authedHandler func(w http.ResponseWriter, r *http.Request, p principal)
@@ -91,7 +132,7 @@ type publicComment struct {
 func toPublic(cs []store.Comment, p principal) []publicComment {
 	out := make([]publicComment, len(cs))
 	for i, c := range cs {
-		mine := !p.tenant() || c.Owner == p.hash // local mode: everything is yours
+		mine := !p.tenant() || p.owns(c.Owner) // local mode: everything is yours
 		c.Owner = ""
 		out[i] = publicComment{Comment: c, Mine: mine}
 	}
@@ -107,7 +148,7 @@ func (s *Server) ownsComment(d store.DocStore, id string, p principal) (found, o
 	}
 	for _, c := range cs {
 		if c.ID == id {
-			return true, !p.tenant() || c.Owner == p.hash, nil
+			return true, !p.tenant() || p.owns(c.Owner), nil
 		}
 	}
 	return false, false, nil
@@ -146,6 +187,12 @@ func (s *Server) handleCreateDoc(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err)
 		return
+	}
+	if u := s.userFrom(r); u != nil && s.owners != nil {
+		if err := s.owners.Add(u.Sub, id); err != nil {
+			writeErr(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 	resp := map[string]any{"id": id, "editorToken": token}
 	if req.HTML != "" {
@@ -249,4 +296,49 @@ func (s *Server) requireOwner(w http.ResponseWriter, d store.DocStore, id string
 		return true
 	}
 	return false
+}
+
+// ── accounts (optional) ─────────────────────────────────────────────────────
+
+// handleMe tells the UI whether accounts are enabled and who the caller is.
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	if s.users == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": false})
+		return
+	}
+	u := s.userFrom(r)
+	if u == nil {
+		writeErr(w, http.StatusUnauthorized, errors.New("not signed in"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"enabled": true, "id": u.Sub, "email": u.Email, "name": u.Name})
+}
+
+// handleMyDocs lists only the caller's own documents.
+func (s *Server) handleMyDocs(w http.ResponseWriter, r *http.Request) {
+	u := s.userFrom(r)
+	if u == nil || s.owners == nil {
+		writeErr(w, http.StatusUnauthorized, errors.New("not signed in"))
+		return
+	}
+	docs, err := s.owners.Docs(u.Sub)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"docs": docs})
+}
+
+// handleClaim attaches a document the caller already edits (via its editor link)
+// to their account.
+func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request, p principal) {
+	if p.user == nil || s.owners == nil {
+		writeErr(w, http.StatusUnauthorized, errors.New("sign in to claim a document"))
+		return
+	}
+	if err := s.owners.Add(p.user.Sub, r.PathValue("doc")); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS grants (
   created_at TEXT NOT NULL,
   PRIMARY KEY (doc, token_hash)
 );
+CREATE TABLE IF NOT EXISTS doc_owners (
+  user_id    TEXT NOT NULL,
+  doc        TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, doc)
+);
 CREATE TABLE IF NOT EXISTS comments (
   n       {{SERIAL}},
   project TEXT NOT NULL,

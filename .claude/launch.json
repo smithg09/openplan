@@ -1,0 +1,21 @@
+{
+ "version": "0.0.1",
+ "configurations": [
+  {
+   "name": "proxy",
+   "runtimeExecutable": "bash",
+   "runtimeArgs": [
+    "/private/tmp/claude-501/-Users-smithg09-Smith-Projects-openplan/723e04df-0692-416e-8cde-5cb290d58b02/scratchpad/run-proxy.sh"
+   ],
+   "port": 8090
+  },
+  {
+   "name": "ui",
+   "runtimeExecutable": "bash",
+   "runtimeArgs": [
+    "/private/tmp/claude-501/-Users-smithg09-Smith-Projects-openplan/723e04df-0692-416e-8cde-5cb290d58b02/scratchpad/run-ui.sh"
+   ],
+   "port": 5195
+  }
+ ]
+}

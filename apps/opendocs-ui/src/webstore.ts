@@ -6,6 +6,7 @@
 // the UI does not know which one it is talking to.
 import sampleHTML from '../../cli/internal/opendocs/sample/retry-storm.html?raw';
 import { DEFAULT_PROXY, capabilityLink } from './env';
+import { USER_HEADER, accountsEnabled, userToken } from './account';
 import { buildFrame } from './frame';
 import { htmlText, htmlTitle } from './lib/htmlmeta';
 import { normalizeProxy, type SearchHit, type Api, type ApiComment, type ApiVersion, type Role } from './api';
@@ -84,6 +85,7 @@ async function proxyCall<T>(base: string, method: string, path: string, token: s
   const headers: Record<string, string> = {};
   if (method !== 'GET') headers['Content-Type'] = 'application/json';
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (accountsEnabled) { const u = await userToken(); if (u) headers[USER_HEADER] = u; }
   let res: Response;
   try {
     res = await fetch(base + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
@@ -100,6 +102,12 @@ async function proxyCall<T>(base: string, method: string, path: string, token: s
 
 async function configuredProxy(): Promise<string> {
   return (await meta<string>('proxy')) || DEFAULT_PROXY;
+}
+
+/** A document published before signing in joins the account the next time it is published. */
+async function claimIfSignedIn(proxy: string, pub: Published): Promise<void> {
+  if (!accountsEnabled || !(await userToken())) return;
+  await proxyCall(proxy, 'POST', `/api/docs/${encodeURIComponent(pub.id)}/claim`, pub.editorToken, {}).catch(() => {});
 }
 
 /** Send comments the proxy hasn't seen (threads before replies) so the shared link shows the review so far. */
@@ -222,6 +230,7 @@ export const webLocalApi: Api = {
     if (prev && prev.proxy === proxy) {
       try {
         await proxyCall(proxy, 'POST', `/api/docs/${encodeURIComponent(prev.id)}/versions`, prev.editorToken, { html: head.html, label: head.label ?? '', summary: '' });
+        await claimIfSignedIn(proxy, prev);
         return { id: prev.id, proxy, new: false, ...(await syncComments(doc, prev)) };
       } catch (e) {
         if (!gone(e)) throw e; // otherwise the proxy lost this document (e.g. its storage was reset): publish afresh below

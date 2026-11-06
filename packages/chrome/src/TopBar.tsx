@@ -24,7 +24,8 @@ export interface TopBarProps {
   actions: TopBarAction[];
   /** Content of the ⋯ menu. */
   menu?: (close: () => void) => React.ReactNode;
-  avatar?: { name: string; onClick: () => void };
+  /** `badgeIcon` joins an icon (e.g. a sign-in glyph) to the avatar inside one bordered pill. */
+  avatar?: { name: string; onClick: () => void; badgeIcon?: string; title?: string };
 }
 
 const initials = (name: string) => (name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join('') || '?').toUpperCase();
@@ -51,7 +52,9 @@ export const TopBar: React.FC<TopBarProps> = ({ brand, brandHref, leading, title
         </span>
       ))}
       {menu && <Dropdown trigger={() => <Button icon={<Icon name="more_horiz" size={17} />} title="More" />}>{menu}</Dropdown>}
-      {avatar && (<><div className="op-topbar-divider" style={{ margin: '0 6px' }} /><button className="op-avatar" title={`${avatar.name} — settings`} onClick={avatar.onClick}>{initials(avatar.name)}</button></>)}
+      {avatar && (<><div className="op-topbar-divider" style={{ margin: '0 6px' }} />{avatar.badgeIcon
+        ? <button className="op-avatar-pill" title={avatar.title ?? avatar.name} aria-label={avatar.title ?? avatar.name} onClick={avatar.onClick}><span className="op-avatar">{initials(avatar.name)}</span><Icon name={avatar.badgeIcon} size={14} /></button>
+        : <button className="op-avatar" title={avatar.title ?? `${avatar.name} — settings`} onClick={avatar.onClick}>{initials(avatar.name)}</button>}</>)}
     </div>
   </div>
 );

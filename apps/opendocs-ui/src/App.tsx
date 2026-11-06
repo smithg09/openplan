@@ -6,6 +6,8 @@ import { TopBar } from './components/TopBar';
 import { Home } from './components/Home';
 import { type Example } from './examples';
 import { WEB } from './env';
+import { accountsEnabled, currentUser, type AccountUser } from './account';
+import { AccountModal } from './components/AccountModal';
 import { listShared, rememberShared, type SharedDoc } from './lib/recent';
 import { LeftPanel, type Heading } from './components/LeftPanel';
 import { AnchoredRail, type RailItem } from './components/AnchoredRail';
@@ -51,7 +53,10 @@ export default function App() {
   const [newVersion, setNewVersion] = React.useState(false);
   const [filter, setFilter] = React.useState<RailFilter>('all');
   const [railHead, setRailHead] = React.useState(0);
-  const [modal, setModal] = React.useState<'share' | 'settings' | 'history' | 'shortcuts' | null>(null);
+  const [modal, setModal] = React.useState<'share' | 'settings' | 'history' | 'shortcuts' | 'account' | null>(null);
+  const [user, setUser] = React.useState<AccountUser | null>(null);
+  const refreshUser = React.useCallback(() => { if (accountsEnabled) void currentUser().then(setUser); }, []);
+  React.useEffect(refreshUser, [refreshUser]);
   const [author, setAuthor] = React.useState(localAuthor());
   const [theme, setThemeState] = React.useState<Theme>(savedTheme());
   const [leftOpen, setLeftOpen] = React.useState(true);
@@ -374,7 +379,8 @@ export default function App() {
     return (
       <>
         <Home
-          docs={docs} shared={shared} fsSupported={fsAccessSupported()} author={author} theme={theme}
+          docs={docs} shared={shared} fsSupported={fsAccessSupported()} author={user?.name ?? author} theme={theme}
+          account={accountsEnabled ? { user, onOpen: () => setModal('account') } : undefined}
           onOpen={(slug) => { if (WEB) history.replaceState(null, '', `${import.meta.env.BASE_URL}?doc=${encodeURIComponent(slug)}`); void openDoc(slug); }}
           onOpenExample={(ex) => void openExample(ex)}
           onUpload={(f) => void uploadAsDoc(f)}
@@ -391,6 +397,7 @@ export default function App() {
         />
         {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
         {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
+        {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
         {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
       </>
     );
@@ -431,7 +438,7 @@ export default function App() {
     <div className="op-app">
       <TopBar
         mode={mode} title={title} versionNo={versionNo} isLatest={!latestId || currentVersionId === latestId}
-        role={role} viewers={viewers} newVersion={newVersion} author={author} theme={theme}
+        role={role} viewers={viewers} newVersion={newVersion} author={user?.name ?? author} theme={theme}
         leftOpen={leftOpen} railOpen={railOpen} focusMode={focusMode}
         canShare={canShare} canWrite={canWrite} openComments={openCount}
         onHistory={() => setModal('history')} onShare={() => setModal('share')}
@@ -441,6 +448,7 @@ export default function App() {
         onPrint={() => postToFrame({ type: 'opendocs:print' })} onUploadVersion={() => uploadRef.current?.click()}
         onSettings={() => setModal('settings')} onShortcuts={() => setModal('shortcuts')}
         onHome={mode === 'local' || WEB ? () => void goHome() : undefined}
+        account={accountsEnabled ? { user, onOpen: () => setModal('account') } : undefined}
       />
       <input ref={uploadRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadFile(f); e.target.value = ''; }} />
 
@@ -512,6 +520,7 @@ export default function App() {
       {modal === 'share' && <ShareDrawer mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('settings')} />}
       {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
       {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
+      {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
     </div>
   );
 }

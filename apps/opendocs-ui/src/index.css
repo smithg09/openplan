@@ -183,3 +183,8 @@ button.od-home-row:hover, .od-home-docrow:hover, .od-home-row-link:hover { backg
 .od-home-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 40px 0; color: var(--text-muted); text-align: center; }
 .od-home-empty b { color: var(--text-primary); font-size: 15px; }
 @media (max-width: 640px) { .od-home-inner { padding: 0 16px 72px; } .od-home-hero { padding: 48px 0 36px; } .od-home-bar { flex-direction: column; align-items: flex-start; } }
+
+.od-auth { display: flex; flex-direction: column; gap: 6px; }
+.od-auth-or { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; color: var(--text-muted); font-size: 12px; }
+.od-auth-or::before, .od-auth-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.od-auth-or span { max-width: 260px; text-align: center; line-height: 1.4; }

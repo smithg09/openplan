@@ -39,7 +39,7 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			if r.Method == http.MethodOptions {
 				h.Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Opendocs-User")
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return
