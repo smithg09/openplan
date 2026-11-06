@@ -163,7 +163,7 @@ export const Home: React.FC<Props> = (p) => {
             <MenuItem icon={<Icon name="settings" size={15} />} label="Settings" onClick={() => { close(); p.onSettings(); }} />
           </>
         )}
-        avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings }}
+        avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings, ...(p.account ? { badgeIcon: p.account.user ? undefined : 'login', title: p.account.user ? `${p.account.user.name} — account` : 'Profile and sign in' } : {}) }}
       />
       <input ref={fileRef} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) p.onUpload(f); e.target.value = ''; }} />
       <div className="od-home">
@@ -185,7 +185,6 @@ export const Home: React.FC<Props> = (p) => {
                 <button className={view === 'grid' ? 'is-on' : ''} title="Card view" aria-label="Card view" onClick={() => setViewSaved('grid')}><Icon name="space_dashboard" size={15} /></button>
                 <button className={view === 'list' ? 'is-on' : ''} title="List view" aria-label="List view" onClick={() => setViewSaved('list')}><Icon name="format_list_bulleted" size={15} /></button>
               </div>
-              {p.account && !p.account.user && <Button kind="outline" size="md" icon={<Icon name="person" size={14} />} onClick={p.account.onOpen}>Sign in</Button>}
               <Button kind="outline" size="md" icon={<Icon name="upload" size={14} />} onClick={() => fileRef.current?.click()}>Upload HTML</Button>
               {p.fsSupported && <Button kind="outline" size="md" icon={<Icon name="folder" size={14} />} onClick={p.onPickFolder}>Open folder</Button>}
             </div>

@@ -13,7 +13,10 @@ export interface AccountUser { id: string; email: string; name: string }
 interface Result<T> { data?: T | null; error?: { message?: string } | null }
 interface Client {
   signUp: { email(a: { email: string; password: string; name: string }): Promise<Result<unknown>> };
-  signIn: { email(a: { email: string; password: string }): Promise<Result<unknown>> };
+  signIn: {
+    email(a: { email: string; password: string }): Promise<Result<unknown>>;
+    social(a: { provider: string; callbackURL: string }): Promise<Result<unknown>>;
+  };
   signOut(): Promise<unknown>;
   getSession(): Promise<Result<{ user?: { id: string; email: string; name?: string } }>>;
   token(): Promise<Result<{ token: string }>>;
@@ -46,6 +49,12 @@ export async function signUp(name: string, email: string, password: string): Pro
 export async function signIn(email: string, password: string): Promise<void> {
   const r = await need().signIn.email({ email, password });
   if (r.error) fail(r, 'Could not sign in');
+}
+
+/** Redirects to the provider and back to this page, where the session is picked up on load. */
+export async function signInWithProvider(provider: 'github'): Promise<void> {
+  const r = await need().signIn.social({ provider, callbackURL: window.location.href });
+  if (r.error) fail(r, 'Could not start sign-in');
 }
 
 export async function signOut(): Promise<void> {

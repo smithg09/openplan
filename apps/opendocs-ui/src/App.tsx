@@ -397,7 +397,7 @@ export default function App() {
         />
         {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
         {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
-        {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} />}
+        {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
         {toast && <div className="op-toast-wrap"><div className="op-toast"><span className="op-toast-bullet">●</span><span>{toast}</span></div></div>}
       </>
     );
@@ -520,7 +520,7 @@ export default function App() {
       {modal === 'share' && <ShareDrawer mode={mode} doc={docSlug} onClose={() => setModal(null)} onOpenSettings={() => setModal('settings')} />}
       {modal === 'settings' && <SettingsModal mode={mode} onClose={() => setModal(null)} onAuthorChange={setAuthor} onThemeChange={setTheme} />}
       {modal === 'shortcuts' && <ShortcutsModal onClose={() => setModal(null)} />}
-      {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} />}
+      {modal === 'account' && <AccountModal user={user} onClose={() => setModal(null)} onChanged={refreshUser} onAuthorChange={setAuthor} />}
     </div>
   );
 }

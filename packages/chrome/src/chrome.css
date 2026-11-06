@@ -400,6 +400,8 @@
 .op-badge { position: absolute; top: -3px; right: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: #fff; font: 600 9px/14px var(--font-mono); text-align: center; pointer-events: none; }
 .op-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent-fg); font: 600 10px var(--font-mono); display: grid; place-items: center; border: 1px solid color-mix(in oklab, var(--accent) 40%, var(--border)); transition: border-color 120ms; }
 .op-avatar:hover { border-color: var(--accent); }
+.op-avatar-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px 0 3px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); background: transparent; transition: border-color 120ms, color 120ms, background 120ms; }
+.op-avatar-pill:hover { border-color: var(--border-strong); color: var(--text-primary); background: var(--bg-subtle); }
 .op-chip { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary); padding: 2px 7px; border-radius: 4px; background: var(--bg-subtle); display: inline-flex; gap: 6px; align-items: center; transition: background 100ms, color 100ms; }
 button.op-chip:hover { color: var(--text-primary); background: var(--bg-hover); }
 .op-btn.is-active { color: var(--text-primary); background: var(--bg-subtle); }

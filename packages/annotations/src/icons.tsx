@@ -8,7 +8,7 @@ import {
   Folder01Icon, ComputerTerminal01Icon, SourceCodeIcon, RoboticIcon, FlashIcon, DashboardSquare01Icon,
   UndoIcon, Copy01Icon, ViewIcon, ViewOffIcon, Alert02Icon,
   GitBranchIcon, Clock01Icon, FullScreenIcon, SidebarRightIcon, SidebarLeftIcon, PrinterIcon, KeyboardIcon,
-  Upload04Icon, ArrowLeft01Icon, ArrowDown01Icon, FolderOpenIcon, Search01Icon, MoreHorizontalIcon,
+  Upload04Icon, Login01Icon, ArrowLeft01Icon, ArrowDown01Icon, FolderOpenIcon, Search01Icon, MoreHorizontalIcon,
   FileExportIcon, PdfIcon, Add01Icon, Refresh01Icon, NotificationOff01Icon, Settings02Icon, GithubIcon, ArrowRight01Icon,
 } from '@hugeicons/core-free-icons';
 
@@ -53,6 +53,7 @@ const REGISTRY: Record<string, Parameters<typeof HugeiconsIcon>[0]['icon']> = {
   language: GlobeIcon,
   open_in_new: LinkSquare02Icon,
   person: User03Icon,
+  login: Login01Icon,
   format_list_bulleted: LeftToRightListBulletIcon,
   folder: Folder01Icon,
   description: File01Icon,

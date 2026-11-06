@@ -118,7 +118,15 @@ Accounts are optional. Anonymous links keep working; signing in adds an identity
 
 3. **Render** (backend): add `OPENDOCS_AUTH_JWKS_URL` = the value of `NEON_AUTH_JWKS_URL`. Redeploy. The proxy now accepts user tokens; without it nothing changes.
 4. **Cloudflare Pages** (web app): add `VITE_NEON_AUTH_URL` = the value of `NEON_AUTH_BASE_URL` (a public URL, not a secret), then redeploy. The sign-in button appears once the variable is set.
-5. Production email: Neon's shared sender is for getting started only. Verification links need your own SMTP (Neon console → Auth → settings); see https://neon.com/docs/auth/production-checklist.md.
+5. **GitHub sign-in** (needs your own OAuth app; Neon has no shared one for GitHub): in GitHub → Settings → Developer settings → OAuth Apps → New, set *Authorization callback URL* to `<NEON_AUTH_BASE_URL>/callback/github` (the Neon Auth URL, not your site), then register it with:
+
+   ```bash
+   neon neon-auth oauth-provider add --provider-id github \
+     --oauth-client-id <client id> --oauth-client-secret-file <file holding the secret>
+   ```
+
+   The "Continue with GitHub" button is always shown; it errors until the provider is added. Add every origin you sign in from as a trusted domain (step 2).
+6. Production email: Neon's shared sender is for getting started only. Verification links need your own SMTP (Neon console → Auth → settings); see https://neon.com/docs/auth/production-checklist.md.
 
 ## Free alternatives for the backend and database
 

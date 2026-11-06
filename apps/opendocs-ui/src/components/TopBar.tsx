@@ -100,6 +100,6 @@ export const TopBar: React.FC<TopBarProps> = (p) => (
         </a>
       </>
     )}
-    avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings }}
+    avatar={{ name: p.author, onClick: p.account ? p.account.onOpen : p.onSettings, ...(p.account ? { badgeIcon: p.account.user ? undefined : 'login', title: p.account.user ? `${p.account.user.name} — account` : 'Profile and sign in' } : {}) }}
   />
 );
